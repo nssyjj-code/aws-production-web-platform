@@ -75,3 +75,21 @@ find_security_group_by_name() {
     --query "SecurityGroups[0].GroupId" \
     --output text
 }
+
+find_latest_amazon_linux_2023_ami() {
+  aws ssm get-parameter \
+    --region "$AWS_REGION" \
+    --name "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64" \
+    --query "Parameter.Value" \
+    --output text
+}
+
+find_launch_template_by_name() {
+  local launch_template_name="$1"
+
+  aws ec2 describe-launch-templates \
+    --region "$AWS_REGION" \
+    --launch-template-names "$launch_template_name" \
+    --query "LaunchTemplates[0].LaunchTemplateId" \
+    --output text 2>/dev/null || echo "None"
+}
