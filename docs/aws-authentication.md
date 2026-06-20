@@ -2,62 +2,70 @@
 
 ## Overview
 
-This project uses short-lived AWS credentials through AWS IAM Identity Center (AWS SSO) instead of long-lived IAM user access keys.
-Using temporary credentials for production environments helps:
+This repository uses the AWS CLI to provision infrastructure within a personal AWS account.
 
-* Eliminate long-lived access keys from developer machines.
-* Reduce the risk of credential compromise.
-* Support centralized access management.
-* Align with AWS security best practices.
+For this project, authentication is performed using an IAM user with programmatic access configured through the AWS CLI. While this approach is appropriate for a personal development environment, enterprise environments should use short-lived credentials through AWS IAM Identity Center (AWS SSO) or assumed IAM roles.
 
-## Configure an AWS SSO Profile
+## Prerequisites
 
-Run the following command to configure a new AWS SSO profile:
+Before deploying infrastructure, ensure you have:
 
-```sh
-aws configure sso --profile portfolio-admin
-```
+* An AWS account
+* An IAM user with programmatic access
+* AWS CLI v2 installed
+* Permissions to create and manage the resources used by this project
 
-Follow the prompts to configure:
+## Configure the AWS CLI
 
-* AWS SSO Start URL
-* AWS SSO Region
-* AWS Account
-* Permission Set (Role)
-* Default Region
-* Output Format
-
-## Authenticate
-
-Start an authenticated session:
+Configure your AWS credentials:
 
 ```sh
-aws sso login --profile portfolio-admin
+aws configure
 ```
 
-The AWS CLI will open a browser window to complete authentication.
+Provide the following information when prompted:
+
+```text
+AWS Access Key ID
+AWS Secret Access Key
+Default region: us-east-1
+Default output format: json
+```
 
 ## Verify Authentication
 
-Confirm the active AWS account before deploying infrastructure:
+Before running any deployment scripts, verify that the AWS CLI is authenticated against the intended AWS account.
 
 ```sh
-aws sts get-caller-identity --profile portfolio-admin
+aws sts get-caller-identity
 ```
 
-Verify the returned Account ID matches the intended AWS account.
+Review the returned output and confirm:
 
-## Deploy Infrastructure
+* The expected AWS Account ID
+* The correct IAM user or role
+* The intended AWS account before creating infrastructure
 
-Run deployment scripts using the configured profile:
+## Security Considerations
 
-```sh
-AWS_PROFILE=portfolio-admin <script>
+This repository intentionally avoids embedding credentials within deployment scripts.
+AWS credentials are resolved through the AWS CLI credential provider chain.
+Never commit the following files to source control:
+
+```text
+~/.aws/credentials
+~/.aws/config
 ```
 
-## Security Notes
+These files should remain local to each developer's workstation.
 
-* Never commit AWS credentials to source control.
-* Prefer temporary credentials over long-lived IAM access keys.
-* Verify the active AWS account before running deployment scripts.
-* Sign in again with `aws sso login` if the session expires.
+## Future Improvements
+
+For a production enterprise environment, authentication would typically be implemented using:
+
+* AWS IAM Identity Center (AWS SSO)
+* IAM role assumption
+* Temporary credentials
+* CI/CD federation (for example, GitHub Actions using OpenID Connect)
+
+These approaches eliminate long-lived access keys and provide centralized identity and access management.
