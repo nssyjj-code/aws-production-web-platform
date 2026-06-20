@@ -32,7 +32,7 @@ VPC_ID=$(aws ec2 describe-vpcs \
   --query "Vpcs[0].VpcId" \
   --output text)
 
-if [[ "$VPC_ID" == "None" ]]; then
+if [[ "$VPC_ID" == "None" || -z "$VPC_ID" ]]; then
   log_error "VPC $VPC_NAME not found. Run 01-create-vpc.sh first."
   exit 1
 fi
@@ -44,6 +44,8 @@ create_subnet() {
   local cidr_block="$2"
   local availability_zone="$3"
   local tier="$4"
+  local existing_subnet_id
+  local subnet_id
 
   log_info "Checking subnet: $subnet_name"
 
@@ -56,23 +58,34 @@ create_subnet() {
     --query "Subnets[0].SubnetId" \
     --output text)
 
-  if [[ "$existing_subnet_id" != "None" ]]; then
-    log_info "Subnet already exists: $subnet_name ($existing_subnet_id)"
-    return 0
+  if [[ "$existing_subnet_id" != "None" && -n "$existing_subnet_id" ]]; then
+    subnet_id="$existing_subnet_id"
+    log_info "Subnet already exists: $subnet_name ($subnet_id)"
+  else
+    log_info "Creating subnet: $subnet_name"
+
+    subnet_id=$(aws ec2 create-subnet \
+      --vpc-id "$VPC_ID" \
+      --cidr-block "$cidr_block" \
+      --availability-zone "$availability_zone" \
+      --region "$AWS_REGION" \
+      --tag-specifications "ResourceType=subnet,Tags=[{Key=Name,Value=$subnet_name},{Key=Project,Value=$PROJECT_NAME},{Key=Tier,Value=$tier}]" \
+      --query "Subnet.SubnetId" \
+      --output text)
+
+    log_success "Created subnet: $subnet_name ($subnet_id)"
   fi
 
-  log_info "Creating subnet: $subnet_name"
+  if [[ "$tier" == "public" ]]; then
+    log_info "Enabling auto-assign public IPv4 for $subnet_name"
 
-  subnet_id=$(aws ec2 create-subnet \
-    --vpc-id "$VPC_ID" \
-    --cidr-block "$cidr_block" \
-    --availability-zone "$availability_zone" \
-    --region "$AWS_REGION" \
-    --tag-specifications "ResourceType=subnet,Tags=[{Key=Name,Value=$subnet_name},{Key=Project,Value=$PROJECT_NAME},{Key=Tier,Value=$tier}]" \
-    --query "Subnet.SubnetId" \
-    --output text)
+    aws ec2 modify-subnet-attribute \
+      --region "$AWS_REGION" \
+      --subnet-id "$subnet_id" \
+      --map-public-ip-on-launch
 
-  log_success "Created subnet: $subnet_name ($subnet_id)"
+    log_success "Auto-assign public IPv4 enabled for $subnet_name"
+  fi
 }
 
 create_subnet "$PROJECT_NAME-public-subnet-az1" "10.0.1.0/24" "$AZ1" "public"

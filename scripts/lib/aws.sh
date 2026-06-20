@@ -64,3 +64,14 @@ find_nat_gateway_by_name() {
     --query "NatGateways[0].NatGatewayId" \
     --output text
 }
+
+find_security_group_by_name() {
+  local vpc_id="$1"
+  local security_group_name="$2"
+
+  aws ec2 describe-security-groups \
+    --region "$AWS_REGION" \
+    --filters "Name=vpc-id,Values=$vpc_id" "Name=group-name,Values=$security_group_name" \
+    --query "SecurityGroups[0].GroupId" \
+    --output text
+}
