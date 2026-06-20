@@ -49,6 +49,27 @@ This project will include:
 - SNS
 - Systems Manager
 
+## Security Considerations
+
+This project follows a layered security model designed to align with AWS best practices.
+
+Current security controls include:
+
+- Private application and database subnets
+- Least-privilege IAM roles
+- Security Groups to restrict network traffic
+- Systems Manager (SSM) for administrative access instead of SSH
+- Encryption for supported services using AWS KMS
+- CloudWatch monitoring and alerting
+
+Future security enhancements could include:
+
+- Amazon CloudFront
+- AWS WAF
+- AWS Shield Advanced
+- AWS Certificate Manager (ACM)
+- Centralized logging and additional threat detection
+
 ## Repository Structure
 
 ```text
