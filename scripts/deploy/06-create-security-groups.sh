@@ -9,7 +9,7 @@ source "$(dirname "$0")/../lib/logging.sh"
 source "$(dirname "$0")/../../config/environment.conf"
 source "$(dirname "$0")/../lib/validation.sh"
 source "$(dirname "$0")/../lib/aws.sh"
-source "$(dirname "$0")/../lib/networking.sh"
+source "$(dirname "$0")/../lib/security.sh"
 
 main() {
   validate_prerequisites
