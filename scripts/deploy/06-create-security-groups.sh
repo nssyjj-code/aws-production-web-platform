@@ -21,23 +21,9 @@ main() {
 
   log_info "Ensuring security groups exist..."
 
-  ALB_SG_ID=$(ensure_security_group \
-    "$VPC_ID" \
-    "$ALB_SG_NAME" \
-    "Allows public web traffic to the Application Load Balancer" \
-    "alb")
-
-  APP_SG_ID=$(ensure_security_group \
-    "$VPC_ID" \
-    "$APP_SG_NAME" \
-    "Allows application traffic from the ALB only" \
-    "app")
-
-  DB_SG_ID=$(ensure_security_group \
-    "$VPC_ID" \
-    "$DB_SG_NAME" \
-    "Allows database traffic from the application tier only" \
-    "database")
+  ALB_SG_ID=$(ensure_security_group "$VPC_ID" "$ALB_SG_NAME" "Allows public web traffic to the Application Load Balancer" "alb")
+  APP_SG_ID=$(ensure_security_group "$VPC_ID" "$APP_SG_NAME" "Allows application traffic from the ALB only" "app")
+  DB_SG_ID=$(ensure_security_group "$VPC_ID" "$DB_SG_NAME" "Allows database traffic from the application tier only" "database")
 
   require_id "Security Group" "$ALB_SG_NAME" "$ALB_SG_ID"
   require_id "Security Group" "$APP_SG_NAME" "$APP_SG_ID"
