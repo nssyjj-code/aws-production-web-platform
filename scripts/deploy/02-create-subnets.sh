@@ -14,13 +14,6 @@ VPC_NAME="$PROJECT_NAME-vpc"
 AZ1="us-east-1a"
 AZ2="us-east-1b"
 
-PUBLIC_SUBNET_AZ1_CIDR="10.0.1.0/24"
-PUBLIC_SUBNET_AZ2_CIDR="10.0.2.0/24"
-PRIVATE_APP_SUBNET_AZ1_CIDR="10.0.11.0/24"
-PRIVATE_APP_SUBNET_AZ2_CIDR="10.0.12.0/24"
-PRIVATE_DB_SUBNET_AZ1_CIDR="10.0.21.0/24"
-PRIVATE_DB_SUBNET_AZ2_CIDR="10.0.22.0/24"
-
 command -v aws >/dev/null 2>&1 || {
   log_error "AWS CLI is not installed."
   exit 1
@@ -46,82 +39,49 @@ fi
 
 log_success "Found VPC: $VPC_ID"
 
-log_info "Creating public subnet in $AZ1..."
+create_subnet() {
+  local subnet_name="$1"
+  local cidr_block="$2"
+  local availability_zone="$3"
+  local tier="$4"
 
-PUBLIC_SUBNET_AZ1_ID=$(aws ec2 create-subnet \
-  --vpc-id "$VPC_ID" \
-  --cidr-block "$PUBLIC_SUBNET_AZ1_CIDR" \
-  --availability-zone "$AZ1" \
-  --region "$AWS_REGION" \
-  --tag-specifications "ResourceType=subnet,Tags=[{Key=Name,Value=$PROJECT_NAME-public-subnet-az1},{Key=Project,Value=$PROJECT_NAME},{Key=Tier,Value=public}]" \
-  --query "Subnet.SubnetId" \
-  --output text)
+  log_info "Checking subnet: $subnet_name"
 
-log_success "Created public subnet AZ1: $PUBLIC_SUBNET_AZ1_ID"
+  existing_subnet_id=$(aws ec2 describe-subnets \
+    --region "$AWS_REGION" \
+    --filters \
+      "Name=vpc-id,Values=$VPC_ID" \
+      "Name=tag:Name,Values=$subnet_name" \
+      "Name=cidr-block,Values=$cidr_block" \
+    --query "Subnets[0].SubnetId" \
+    --output text)
 
-log_info "Creating public subnet in $AZ2..."
+  if [[ "$existing_subnet_id" != "None" ]]; then
+    log_info "Subnet already exists: $subnet_name ($existing_subnet_id)"
+    return 0
+  fi
 
-PUBLIC_SUBNET_AZ2_ID=$(aws ec2 create-subnet \
-  --vpc-id "$VPC_ID" \
-  --cidr-block "$PUBLIC_SUBNET_AZ2_CIDR" \
-  --availability-zone "$AZ2" \
-  --region "$AWS_REGION" \
-  --tag-specifications "ResourceType=subnet,Tags=[{Key=Name,Value=$PROJECT_NAME-public-subnet-az2},{Key=Project,Value=$PROJECT_NAME},{Key=Tier,Value=public}]" \
-  --query "Subnet.SubnetId" \
-  --output text)
+  log_info "Creating subnet: $subnet_name"
 
-log_success "Created public subnet AZ2: $PUBLIC_SUBNET_AZ2_ID"
+  subnet_id=$(aws ec2 create-subnet \
+    --vpc-id "$VPC_ID" \
+    --cidr-block "$cidr_block" \
+    --availability-zone "$availability_zone" \
+    --region "$AWS_REGION" \
+    --tag-specifications "ResourceType=subnet,Tags=[{Key=Name,Value=$subnet_name},{Key=Project,Value=$PROJECT_NAME},{Key=Tier,Value=$tier}]" \
+    --query "Subnet.SubnetId" \
+    --output text)
 
-log_info "Creating private app subnet in $AZ1..."
+  log_success "Created subnet: $subnet_name ($subnet_id)"
+}
 
-PRIVATE_APP_SUBNET_AZ1_ID=$(aws ec2 create-subnet \
-  --vpc-id "$VPC_ID" \
-  --cidr-block "$PRIVATE_APP_SUBNET_AZ1_CIDR" \
-  --availability-zone "$AZ1" \
-  --region "$AWS_REGION" \
-  --tag-specifications "ResourceType=subnet,Tags=[{Key=Name,Value=$PROJECT_NAME-private-app-subnet-az1},{Key=Project,Value=$PROJECT_NAME},{Key=Tier,Value=private-app}]" \
-  --query "Subnet.SubnetId" \
-  --output text)
+create_subnet "$PROJECT_NAME-public-subnet-az1" "10.0.1.0/24" "$AZ1" "public"
+create_subnet "$PROJECT_NAME-public-subnet-az2" "10.0.2.0/24" "$AZ2" "public"
 
-log_success "Created private app subnet AZ1: $PRIVATE_APP_SUBNET_AZ1_ID"
+create_subnet "$PROJECT_NAME-private-app-subnet-az1" "10.0.11.0/24" "$AZ1" "private-app"
+create_subnet "$PROJECT_NAME-private-app-subnet-az2" "10.0.12.0/24" "$AZ2" "private-app"
 
-log_info "Creating private app subnet in $AZ2..."
+create_subnet "$PROJECT_NAME-private-db-subnet-az1" "10.0.21.0/24" "$AZ1" "private-db"
+create_subnet "$PROJECT_NAME-private-db-subnet-az2" "10.0.22.0/24" "$AZ2" "private-db"
 
-PRIVATE_APP_SUBNET_AZ2_ID=$(aws ec2 create-subnet \
-  --vpc-id "$VPC_ID" \
-  --cidr-block "$PRIVATE_APP_SUBNET_AZ2_CIDR" \
-  --availability-zone "$AZ2" \
-  --region "$AWS_REGION" \
-  --tag-specifications "ResourceType=subnet,Tags=[{Key=Name,Value=$PROJECT_NAME-private-app-subnet-az2},{Key=Project,Value=$PROJECT_NAME},{Key=Tier,Value=private-app}]" \
-  --query "Subnet.SubnetId" \
-  --output text)
-
-log_success "Created private app subnet AZ2: $PRIVATE_APP_SUBNET_AZ2_ID"
-
-log_info "Creating private database subnet in $AZ1..."
-
-PRIVATE_DB_SUBNET_AZ1_ID=$(aws ec2 create-subnet \
-  --vpc-id "$VPC_ID" \
-  --cidr-block "$PRIVATE_DB_SUBNET_AZ1_CIDR" \
-  --availability-zone "$AZ1" \
-  --region "$AWS_REGION" \
-  --tag-specifications "ResourceType=subnet,Tags=[{Key=Name,Value=$PROJECT_NAME-private-db-subnet-az1},{Key=Project,Value=$PROJECT_NAME},{Key=Tier,Value=private-db}]" \
-  --query "Subnet.SubnetId" \
-  --output text)
-
-log_success "Created private database subnet AZ1: $PRIVATE_DB_SUBNET_AZ1_ID"
-
-log_info "Creating private database subnet in $AZ2..."
-
-PRIVATE_DB_SUBNET_AZ2_ID=$(aws ec2 create-subnet \
-  --vpc-id "$VPC_ID" \
-  --cidr-block "$PRIVATE_DB_SUBNET_AZ2_CIDR" \
-  --availability-zone "$AZ2" \
-  --region "$AWS_REGION" \
-  --tag-specifications "ResourceType=subnet,Tags=[{Key=Name,Value=$PROJECT_NAME-private-db-subnet-az2},{Key=Project,Value=$PROJECT_NAME},{Key=Tier,Value=private-db}]" \
-  --query "Subnet.SubnetId" \
-  --output text)
-
-log_success "Created private database subnet AZ2: $PRIVATE_DB_SUBNET_AZ2_ID"
-
-log_success "Subnet creation complete."
+log_success "Subnet setup complete."
