@@ -21,6 +21,22 @@ The platform includes:
 * Auto Scaling Group
 * Private Aurora MySQL database
 
+## Features
+
+* Multi-Availability Zone VPC architecture
+* Public, private application, and private database subnets
+* High availability using NAT Gateways in each Availability Zone
+* Layered security groups following least privilege principles
+* IAM roles and instance profiles for EC2
+* Application Load Balancer with Target Group
+* Launch Template and Auto Scaling Group
+* Private Amazon Aurora MySQL database
+* Modular deployment scripts
+* Shared helper libraries for reusable infrastructure functions
+* Idempotent deployments that safely re-run existing resources
+* Automated deployment and verification scripts
+* Configuration-driven environment using a centralized configuration file
+
 ## Current Status
 
 Core infrastructure deployment is complete using AWS CLI automation.
