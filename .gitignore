@@ -36,3 +36,4 @@ echo "aws/" >> .gitignore
 git add .gitignore
 git commit -m "chore: ignore aws/ distribution folder"
 git pushaws/
+aws/
