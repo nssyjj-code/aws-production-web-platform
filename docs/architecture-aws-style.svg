@@ -1,0 +1,181 @@
+<svg width="100%" viewBox="0 0 680 1100" role="img" xmlns="http://www.w3.org/2000/svg">
+<title>AWS Production Web Platform Architecture</title>
+<desc>Three-tier AWS production architecture with security groups, public/private subnets, ALB, ASG, Aurora MySQL, and NAT gateways across two availability zones.</desc>
+<defs>
+  <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </marker>
+  <style>
+    text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .th { font-size: 13px; font-weight: 600; fill: #0f1419; }
+    .ts { font-size: 11px; font-weight: 400; fill: #3f464e; }
+    .tl { font-size: 10px; font-weight: 400; fill: #3f464e; }
+  </style>
+</defs>
+
+<!-- Internet -->
+<rect x="275" y="14" width="130" height="38" rx="6" fill="#f5f5f5" stroke="#b0b0b0" stroke-width="1.5"/>
+<text class="th" x="340" y="38" text-anchor="middle">Internet</text>
+
+<!-- Arrow: Internet -> ALB -->
+<line x1="340" y1="52" x2="340" y2="78" stroke="#ff9900" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+
+<!-- ALB (AWS Orange) -->
+<rect x="170" y="78" width="340" height="56" rx="6" fill="#fff3cd" stroke="#ff9900" stroke-width="2"/>
+<text class="th" x="340" y="102" text-anchor="middle" font-size="14" fill="#232f3e" font-weight="700">Application Load Balancer</text>
+<text class="ts" x="340" y="120" text-anchor="middle" font-size="11">Public subnets · HTTP :80 / :443</text>
+
+<!-- Arrow: ALB -> Target Group -->
+<line x1="340" y1="134" x2="340" y2="170" stroke="#ff9900" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+
+<!-- Target Group (explicit, visible) -->
+<rect x="260" y="170" width="160" height="50" rx="6" fill="#e8f1ff" stroke="#0066cc" stroke-width="2"/>
+<text class="th" x="340" y="192" text-anchor="middle" fill="#0066cc" font-size="13" font-weight="700">Target Group</text>
+<text class="ts" x="340" y="208" text-anchor="middle" font-size="10">HTTP :80</text>
+
+<!-- Arrow: Target Group -> App Subnets -->
+<line x1="340" y1="220" x2="340" y2="254" stroke="#0066cc" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+
+<!-- VPC boundary -->
+<rect x="18" y="250" width="644" height="510" rx="12" fill="none" stroke="#3f464e" stroke-width="2" stroke-dasharray="8 4"/>
+<text x="36" y="272" class="th" font-size="12" fill="#3f464e" font-weight="700">VPC · 10.0.0.0/16</text>
+
+<!-- AZ A label -->
+<text x="50" y="295" class="th" font-size="11" fill="#ff9900" font-weight="700">Availability Zone A (us-east-1a)</text>
+<!-- AZ B label -->
+<text x="362" y="295" class="th" font-size="11" fill="#ff9900" font-weight="700">Availability Zone B (us-east-1b)</text>
+
+<!-- AZ A boundary -->
+<rect x="36" y="302" width="296" height="450" rx="10" fill="none" stroke="#ff9900" stroke-width="1" stroke-dasharray="4 3" opacity="0.6"/>
+<!-- AZ B boundary -->
+<rect x="352" y="302" width="296" height="450" rx="10" fill="none" stroke="#ff9900" stroke-width="1" stroke-dasharray="4 3" opacity="0.6"/>
+
+<!-- PUBLIC SUBNET A -->
+<rect x="50" y="316" width="268" height="80" rx="8" fill="#dcf4e0" stroke="#00a651" stroke-width="1.5"/>
+<text class="th" x="184" y="335" text-anchor="middle" fill="#00653b" font-weight="700">Public Subnet A</text>
+<text class="ts" x="184" y="350" text-anchor="middle" font-size="10">10.0.1.0/24</text>
+<rect x="64" y="360" width="100" height="28" rx="5" fill="#fff" stroke="#00a651" stroke-width="1"/>
+<text class="th" x="114" y="378" text-anchor="middle" font-size="11" fill="#00653b">NAT Gateway</text>
+<rect x="176" y="360" width="100" height="28" rx="5" fill="#fff" stroke="#888" stroke-width="1"/>
+<text class="th" x="226" y="378" text-anchor="middle" font-size="11">Elastic IP</text>
+
+<!-- PUBLIC SUBNET B -->
+<rect x="366" y="316" width="268" height="80" rx="8" fill="#dcf4e0" stroke="#00a651" stroke-width="1.5"/>
+<text class="th" x="500" y="335" text-anchor="middle" fill="#00653b" font-weight="700">Public Subnet B</text>
+<text class="ts" x="500" y="350" text-anchor="middle" font-size="10">10.0.2.0/24</text>
+<rect x="380" y="360" width="100" height="28" rx="5" fill="#fff" stroke="#00a651" stroke-width="1"/>
+<text class="th" x="430" y="378" text-anchor="middle" font-size="11" fill="#00653b">NAT Gateway</text>
+<rect x="492" y="360" width="100" height="28" rx="5" fill="#fff" stroke="#888" stroke-width="1"/>
+<text class="th" x="542" y="378" text-anchor="middle" font-size="11">Elastic IP</text>
+
+<!-- PRIVATE APP SUBNET A -->
+<rect x="50" y="420" width="268" height="110" rx="8" fill="#fde8f5" stroke="#c12d98" stroke-width="1.5"/>
+<text class="th" x="184" y="441" text-anchor="middle" fill="#88216d" font-weight="700">Private App Subnet A</text>
+<text class="ts" x="184" y="457" text-anchor="middle" font-size="10">10.0.3.0/24</text>
+<text class="ts" x="184" y="472" text-anchor="middle" font-size="9" fill="#88216d" font-weight="600">Auto Scaling Group</text>
+<rect x="58" y="480" width="240" height="40" rx="6" fill="none" stroke="#ff9900" stroke-width="1" stroke-dasharray="3 3" opacity="0.7"/>
+<rect x="68" y="485" width="98" height="30" rx="5" fill="#fff3cd" stroke="#ff9900" stroke-width="1"/>
+<text class="th" x="117" y="504" text-anchor="middle" font-size="11" fill="#7a4601">EC2</text>
+<rect x="180" y="485" width="98" height="30" rx="5" fill="#fff3cd" stroke="#ff9900" stroke-width="1"/>
+<text class="th" x="229" y="504" text-anchor="middle" font-size="11" fill="#7a4601">EC2</text>
+
+<!-- PRIVATE APP SUBNET B -->
+<rect x="366" y="420" width="268" height="110" rx="8" fill="#fde8f5" stroke="#c12d98" stroke-width="1.5"/>
+<text class="th" x="500" y="441" text-anchor="middle" fill="#88216d" font-weight="700">Private App Subnet B</text>
+<text class="ts" x="500" y="457" text-anchor="middle" font-size="10">10.0.4.0/24</text>
+<text class="ts" x="500" y="472" text-anchor="middle" font-size="9" fill="#88216d" font-weight="600">Auto Scaling Group</text>
+<rect x="374" y="480" width="240" height="40" rx="6" fill="none" stroke="#ff9900" stroke-width="1" stroke-dasharray="3 3" opacity="0.7"/>
+<rect x="384" y="485" width="98" height="30" rx="5" fill="#fff3cd" stroke="#ff9900" stroke-width="1"/>
+<text class="th" x="433" y="504" text-anchor="middle" font-size="11" fill="#7a4601">EC2</text>
+<rect x="496" y="485" width="98" height="30" rx="5" fill="#fff3cd" stroke="#ff9900" stroke-width="1"/>
+<text class="th" x="545" y="504" text-anchor="middle" font-size="11" fill="#7a4601">EC2</text>
+
+<!-- Target Group -> App A -->
+<path d="M284 220 L184 220 L184 420" fill="none" stroke="#c12d98" stroke-width="1.5" marker-end="url(#arrow)"/>
+<!-- Target Group -> App B -->
+<path d="M396 220 L500 220 L500 420" fill="none" stroke="#c12d98" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<!-- PRIVATE DB SUBNET A -->
+<rect x="50" y="564" width="268" height="110" rx="8" fill="#ffe4e8" stroke="#d64545" stroke-width="1.5"/>
+<text class="th" x="184" y="585" text-anchor="middle" fill="#a31d26" font-weight="700">Private DB Subnet A</text>
+<text class="ts" x="184" y="601" text-anchor="middle" font-size="10">10.0.5.0/24</text>
+<rect x="76" y="615" width="216" height="50" rx="6" fill="#fff5f5" stroke="#d64545" stroke-width="1.5"/>
+<text class="th" x="184" y="637" text-anchor="middle" fill="#a31d26" font-weight="600">Aurora MySQL</text>
+<text class="ts" x="184" y="655" text-anchor="middle" font-size="9">Primary</text>
+
+<!-- PRIVATE DB SUBNET B -->
+<rect x="366" y="564" width="268" height="110" rx="8" fill="#ffe4e8" stroke="#d64545" stroke-width="1.5"/>
+<text class="th" x="500" y="585" text-anchor="middle" fill="#a31d26" font-weight="700">Private DB Subnet B</text>
+<text class="ts" x="500" y="601" text-anchor="middle" font-size="10">10.0.6.0/24</text>
+<rect x="392" y="615" width="216" height="50" rx="6" fill="#fff5f5" stroke="#d64545" stroke-width="1.5"/>
+<text class="th" x="500" y="637" text-anchor="middle" fill="#a31d26" font-weight="600">Aurora MySQL</text>
+<text class="ts" x="500" y="655" text-anchor="middle" font-size="9">Reader Replica</text>
+
+<!-- App -> DB -->
+<line x1="184" y1="530" x2="184" y2="615" stroke="#d64545" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+<line x1="500" y1="530" x2="500" y2="615" stroke="#d64545" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+
+<!-- Aurora Replication -->
+<path d="M292 640 L366 640" fill="none" stroke="#d64545" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arrow)"/>
+<text class="ts" x="329" y="633" text-anchor="middle" font-size="9" fill="#a31d26">Replication</text>
+
+<!-- S3 (outside VPC) -->
+<rect x="250" y="715" width="180" height="50" rx="6" fill="#f0f8ff" stroke="#0066cc" stroke-width="1.5"/>
+<text class="th" x="340" y="738" text-anchor="middle" fill="#0066cc" font-weight="700">Amazon S3</text>
+<text class="ts" x="340" y="755" text-anchor="middle" font-size="9">Assets & logs</text>
+
+<!-- EC2 -> S3 -->
+<path d="M184 515 L184 725 L250 740" fill="none" stroke="#0066cc" stroke-width="1" stroke-dasharray="4 3" opacity="0.7" marker-end="url(#arrow)"/>
+<path d="M500 515 L500 725 L430 740" fill="none" stroke="#0066cc" stroke-width="1" stroke-dasharray="4 3" opacity="0.7" marker-end="url(#arrow)"/>
+
+<!-- Outbound via NAT -->
+<path d="M114 360 L114 330 L184 330 L184 316" fill="none" stroke="#00a651" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+<path d="M430 360 L430 330 L500 330 L500 316" fill="none" stroke="#00a651" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+
+<!-- SECURITY GROUPS SECTION -->
+<text x="36" y="810" class="th" font-size="14" fill="#232f3e" font-weight="700">Security Groups & Rules</text>
+
+<!-- ALB SG -->
+<rect x="18" y="828" width="208" height="145" rx="8" fill="#f8f9fa" stroke="#dce3e9" stroke-width="1.5"/>
+<rect x="26" y="836" width="192" height="26" rx="6" fill="#fff3cd" stroke="#ff9900" stroke-width="1"/>
+<text class="th" x="122" y="856" text-anchor="middle" fill="#7a4601" font-weight="700">ALB Security Group</text>
+<line x1="26" y1="868" x2="210" y2="868" stroke="#dce3e9" stroke-width="0.5"/>
+<text class="tl" x="28" y="883">Inbound (0.0.0.0/0)</text>
+<text class="tl" x="36" y="897">· HTTP 80, HTTPS 443</text>
+<text class="tl" x="28" y="913">Outbound</text>
+<text class="tl" x="36" y="927">· HTTP 80 → App SG</text>
+<text class="tl" x="36" y="941">· HTTPS 443 → App SG</text>
+
+<!-- App SG -->
+<rect x="236" y="828" width="208" height="145" rx="8" fill="#f8f9fa" stroke="#dce3e9" stroke-width="1.5"/>
+<rect x="244" y="836" width="192" height="26" rx="6" fill="#fde8f5" stroke="#c12d98" stroke-width="1"/>
+<text class="th" x="340" y="856" text-anchor="middle" fill="#88216d" font-weight="700">App Security Group</text>
+<line x1="244" y1="868" x2="428" y2="868" stroke="#dce3e9" stroke-width="0.5"/>
+<text class="tl" x="246" y="883">Inbound</text>
+<text class="tl" x="254" y="897">· HTTP 80 from ALB SG</text>
+<text class="tl" x="246" y="913">Outbound</text>
+<text class="tl" x="254" y="927">· MySQL 3306 → DB SG</text>
+<text class="tl" x="254" y="941">· HTTPS 443 (external)</text>
+
+<!-- DB SG -->
+<rect x="454" y="828" width="208" height="145" rx="8" fill="#f8f9fa" stroke="#dce3e9" stroke-width="1.5"/>
+<rect x="462" y="836" width="192" height="26" rx="6" fill="#ffe4e8" stroke="#d64545" stroke-width="1"/>
+<text class="th" x="558" y="856" text-anchor="middle" fill="#a31d26" font-weight="700">DB Security Group</text>
+<line x1="462" y1="868" x2="646" y2="868" stroke="#dce3e9" stroke-width="0.5"/>
+<text class="tl" x="464" y="883">Inbound</text>
+<text class="tl" x="472" y="897">· MySQL 3306 from</text>
+<text class="tl" x="472" y="911">  App SG</text>
+<text class="tl" x="464" y="927">Outbound</text>
+<text class="tl" x="472" y="941">· Restricted (none)</text>
+
+<!-- Legend -->
+<line x1="36" y1="1000" x2="56" y2="1000" stroke="#ff9900" stroke-width="2"/>
+<text class="ts" x="62" y="1004">Primary traffic</text>
+<line x1="180" y1="1000" x2="200" y2="1000" stroke="#d64545" stroke-width="1.5"/>
+<text class="ts" x="206" y="1004">Database flow</text>
+<line x1="310" y1="1000" x2="330" y2="1000" stroke="#0066cc" stroke-width="1" stroke-dasharray="4 3"/>
+<text class="ts" x="336" y="1004">Data egress</text>
+<line x1="440" y1="1000" x2="460" y2="1000" stroke="#00a651" stroke-width="1" stroke-dasharray="4 3"/>
+<text class="ts" x="466" y="1004">Internet egress</text>
+
+</svg>
