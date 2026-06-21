@@ -93,3 +93,13 @@ find_launch_template_by_name() {
     --query "LaunchTemplates[0].LaunchTemplateId" \
     --output text 2>/dev/null || echo "None"
 }
+
+find_auto_scaling_group_by_name() {
+  local asg_name="$1"
+
+  aws autoscaling describe-auto-scaling-groups \
+    --region "$AWS_REGION" \
+    --auto-scaling-group-names "$asg_name" \
+    --query "AutoScalingGroups[0].AutoScalingGroupName" \
+    --output text 2>/dev/null || echo "None"
+}
