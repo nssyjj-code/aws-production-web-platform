@@ -1,99 +1,69 @@
 # AWS Production Web Platform
 
-## Overview
+A production-style AWS infrastructure project built with Bash and the AWS CLI before transitioning to Terraform.
 
-This project builds a production-style AWS web platform designed to demonstrate core cloud engineering skills, including networking, security, compute, monitoring, automation, and high availability.
-
-The goal is to design and deploy an AWS environment similar to what a small company might use to host a secure and scalable web application.
-
-## Project Goals
-
-- Build a custom AWS VPC with public and private subnets
-- Deploy compute resources behind a load balancer
-- Implement security best practices using IAM roles and security groups
-- Add monitoring, logging, and alerting with CloudWatch
-- Automate deployment using AWS CLI and Bash
-- Document deployment, troubleshooting, cost, and security decisions
-- Simulate real-world operational scenarios such as instance failure and recovery
+This project provisions a multi-tier, highly available web platform using modular, idempotent deployment scripts and shared helper libraries.
 
 ## Architecture
 
-This project will include:
+The platform includes:
 
-- VPC across multiple Availability Zones
-- Public and private subnets
-- Internet Gateway and NAT Gateway
-- Application Load Balancer
-- EC2 instances
-- Auto Scaling Group
-- RDS database
-- S3 storage
-- CloudWatch monitoring
-- SNS alerts
-- IAM roles
-- Systems Manager access
+* Multi-AZ VPC
+* Public, private application, and private database subnets
+* Internet Gateway
+* NAT Gateways per Availability Zone
+* Custom route tables
+* Layered security groups
+* EC2 IAM role and instance profile for SSM access
+* Launch Template
+* Application Load Balancer
+* Target Group
+* Auto Scaling Group
+* Private Aurora MySQL database
 
-## Technologies Used
+## Current Status
 
-- AWS
-- AWS CLI
-- Bash
-- EC2
-- VPC
-- ALB
-- Auto Scaling
-- RDS
-- S3
-- IAM
-- CloudWatch
-- SNS
-- Systems Manager
-
-## Security Considerations
-
-This project follows a layered security model designed to align with AWS best practices.
-
-Current security controls include:
-
-- Private application and database subnets
-- Least-privilege IAM roles
-- Security Groups to restrict network traffic
-- Systems Manager (SSM) for administrative access instead of SSH
-- Encryption for supported services using AWS KMS
-- CloudWatch monitoring and alerting
-
-Future security enhancements could include:
-
-- Amazon CloudFront
-- AWS WAF
-- AWS Shield Advanced
-- AWS Certificate Manager (ACM)
-- Centralized logging and additional threat detection
+Core infrastructure deployment is complete using AWS CLI automation.
 
 ## Repository Structure
 
 ```text
-aws-production-web-platform/
-├── architecture/
-├── assets/
-├── config/
-├── docs/
-├── monitoring/
-├── screenshots/
-└── scripts/
+config/       Shared environment configuration
+docs/         Project documentation
+diagrams/     Architecture diagrams
+monitoring/   Future CloudWatch dashboards and alarms
+policies/     IAM trust policies
+scripts/      Deployment, verification, destroy, and helper scripts
+user-data/    EC2 bootstrap scripts
 ```
 
-## Project Status
+## Deployment
 
-In progress.
+```bash
+export DB_MASTER_USERNAME="adminuser"
+export DB_MASTER_PASSWORD="Use-A-Strong-Password-Here123!"
 
-Current phase: project planning and architecture design.
+./deploy.sh
+```
 
-## Future Improvements
+## Verification
 
-- Rebuild using CloudFormation
-- Rebuild using Terraform
-- Add GitHub Actions CI/CD
-- Containerize the application
-- Deploy with ECS or EKS
-- Add advanced observability tooling
+```bash
+./verify.sh
+```
+
+## Security Notes
+
+* No AWS credentials are committed to the repository.
+* EC2 instances use IAM roles instead of access keys.
+* Application instances are deployed in private subnets.
+* Database resources are deployed in private database subnets.
+* Security groups follow a layered access model:
+
+  * Internet → ALB
+  * ALB → Application
+  * Application → Database
+
+## Project Goal
+
+The goal of this repository is to demonstrate production-style cloud engineering practices using AWS CLI before rebuilding the same architecture with Terraform.
