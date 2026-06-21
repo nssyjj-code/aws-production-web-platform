@@ -1,0 +1,32 @@
+# Binaries & archives
+*.zip
+*.tar.gz
+*.tar
+*.gz
+
+# Logs
+*.log
+
+# Environment & credentials
+.env
+.env.local
+credentials
+*.pem
+*.key
+
+# Terraform
+*.tfstate
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+
+# Python
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+
+# AWS SAM
+.aws-sam/
+samconfig.toml
