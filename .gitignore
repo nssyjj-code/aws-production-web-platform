@@ -30,3 +30,9 @@ __pycache__/
 # AWS SAM
 .aws-sam/
 samconfig.toml
+
+# AWS distribution folder
+echo "aws/" >> .gitignore
+git add .gitignore
+git commit -m "chore: ignore aws/ distribution folder"
+git pushaws/
