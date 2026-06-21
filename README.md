@@ -6,7 +6,7 @@ This project provisions a multi-tier, highly available web platform using modula
 
 ## Architecture
 
-![AWS Production Web Platform Architecture](diagrams/aws-production-web-platform-architecture.png)
+![AWS Production Web Platform Architecture](architecture/architecture.svg)
 
 The platform includes:
 
