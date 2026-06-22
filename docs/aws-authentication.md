@@ -2,70 +2,129 @@
 
 ## Overview
 
-This repository uses the AWS CLI to provision infrastructure within a personal AWS account.
+This project provisions AWS infrastructure using the AWS CLI and authenticates through a dedicated IAM user configured locally on the developer workstation.
 
-For this project, authentication is performed using an IAM user with programmatic access configured through the AWS CLI. While this approach is appropriate for a personal development environment, enterprise environments should use short-lived credentials through AWS IAM Identity Center (AWS SSO) or assumed IAM roles.
+The authentication approach was intentionally selected for a personal development environment to simplify deployment and infrastructure testing.
 
-## Prerequisites
+For enterprise environments, AWS recommends short-lived credentials through IAM roles, IAM Identity Center (AWS SSO), or workload federation.
 
-Before deploying infrastructure, ensure you have:
+---
 
-* An AWS account
-* An IAM user with programmatic access
-* AWS CLI v2 installed
-* Permissions to create and manage the resources used by this project
+## Authentication Method Used
 
-## Configure the AWS CLI
+This project uses:
 
-Configure your AWS credentials:
+* AWS CLI v2
+* IAM user credentials stored locally
+* AWS shared credentials file
+* AWS shared configuration file
 
-```sh
+Authentication is resolved through the AWS CLI credential provider chain.
+
+The deployment scripts do not contain embedded credentials.
+
+---
+
+## Local Configuration
+
+Configure credentials locally:
+
+```bash
 aws configure
 ```
 
-Provide the following information when prompted:
+Example configuration:
 
 ```text
-AWS Access Key ID
-AWS Secret Access Key
-Default region: us-east-1
-Default output format: json
+AWS Access Key ID     = ********************
+AWS Secret Access Key = ********************
+Default region        = us-east-1
+Output format         = json
 ```
 
-## Verify Authentication
+Verify authentication:
 
-Before running any deployment scripts, verify that the AWS CLI is authenticated against the intended AWS account.
-
-```sh
+```bash
 aws sts get-caller-identity
 ```
 
-Review the returned output and confirm:
+Expected validation:
 
-* The expected AWS Account ID
-* The correct IAM user or role
-* The intended AWS account before creating infrastructure
+* Correct AWS account
+* Correct IAM identity
+* Correct AWS region
 
-## Security Considerations
+Infrastructure should only be deployed after identity verification is completed.
 
-This repository intentionally avoids embedding credentials within deployment scripts.
-AWS credentials are resolved through the AWS CLI credential provider chain.
-Never commit the following files to source control:
+---
+
+## Security Controls
+
+The repository does not store AWS credentials.
+
+Sensitive files remain local to the workstation:
 
 ```text
 ~/.aws/credentials
 ~/.aws/config
 ```
 
-These files should remain local to each developer's workstation.
+These files are excluded from source control.
 
-## Future Improvements
+Additional security measures:
 
-For a production enterprise environment, authentication would typically be implemented using:
+* MFA enabled on the AWS account
+* Least-privilege IAM permissions where practical
+* Credentials never referenced directly in scripts
+* Credentials resolved through AWS SDK and CLI authentication mechanisms
 
-* AWS IAM Identity Center (AWS SSO)
-* IAM role assumption
+---
+
+## Production Considerations
+
+The authentication model used in this project is appropriate for a personal development environment but would not be the preferred approach for a production environment.
+
+A production implementation would use one of the following:
+
+### IAM Identity Center (AWS SSO)
+
+Benefits:
+
+* Centralized identity management
 * Temporary credentials
-* CI/CD federation (for example, GitHub Actions using OpenID Connect)
+* Improved auditing
+* Simplified access revocation
 
-These approaches eliminate long-lived access keys and provide centralized identity and access management.
+### IAM Role Assumption
+
+Benefits:
+
+* No long-lived access keys
+* Temporary credentials
+* Reduced credential exposure risk
+
+### CI/CD Federation
+
+Example:
+
+```text
+GitHub Actions → OpenID Connect (OIDC) → AWS IAM Role
+```
+
+Benefits:
+
+* No stored AWS secrets
+* Short-lived credentials
+* Automated deployment workflows
+
+---
+
+## Lessons Learned
+
+This project reinforced several AWS security principles:
+
+* Never store credentials in source control.
+* Verify identity before provisioning resources.
+* Prefer temporary credentials whenever possible.
+* Separate development authentication practices from production authentication practices.
+* Design automation to rely on AWS-native credential resolution rather than hardcoded secrets.
