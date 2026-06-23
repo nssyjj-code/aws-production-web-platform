@@ -40,6 +40,33 @@ Required:
 
 ---
 
+## Required Environment Variables
+
+Database credentials are intentionally excluded from source control.
+
+Before deploying the platform, export the required Aurora database credentials:
+
+```bash
+export DB_MASTER_USERNAME="adminuser"
+export DB_MASTER_PASSWORD="ReplaceWithAStrongPassword123"
+```
+
+Verify the variables are set:
+
+```bash
+echo "$DB_MASTER_USERNAME"
+echo "$DB_MASTER_PASSWORD"
+```
+
+These variables are consumed during Aurora cluster creation and are not stored in the repository.
+
+> Production environments should retrieve credentials from AWS Secrets Manager or another centralized secrets management solution rather than manually exporting values.
+
+```
+```
+
+---
+
 ## Required Tools
 
 | Tool    | Required Version |
