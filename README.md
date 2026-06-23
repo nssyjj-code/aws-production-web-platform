@@ -70,6 +70,23 @@ export DB_MASTER_PASSWORD="Use-A-Strong-Password-Here123!"
 ./verify.sh
 ```
 
+## Monitoring
+
+This project includes CloudWatch monitoring automation.
+
+Implemented:
+
+- CloudWatch dashboard for ALB, Auto Scaling, and Aurora metrics
+- CloudWatch alarms for unhealthy targets, 5XX errors, latency, ASG capacity, and Aurora health
+- Separate monitoring scripts under `/monitoring`
+
+Run:
+
+```bash
+./monitoring/dashboards/create-dashboard.sh
+./monitoring/alarms/create-alarms.sh
+```
+
 ## Security Notes
 
 * No AWS credentials are committed to the repository.
