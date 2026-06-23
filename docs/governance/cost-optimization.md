@@ -18,6 +18,50 @@ This project follows concepts from the AWS Well-Architected Framework Cost Optim
 
 ---
 
+# Estimated Development Cost
+
+This project is intended as a portfolio and learning environment rather than a continuously running production workload.
+
+Approximate monthly costs in us-east-1 at default sizing:
+
+| Service                   | Estimated Monthly Cost |
+| ------------------------- | ---------------------- |
+| NAT Gateways (2)          | High                   |
+| Aurora MySQL              | High                   |
+| EC2 Instances             | Moderate               |
+| Application Load Balancer | Moderate               |
+| Storage and Data Transfer | Variable               |
+
+Expected monthly operating cost:
+
+```text
+Approximately $80–120/month
+```
+
+Actual costs will vary based on:
+
+* EC2 instance type
+* Aurora instance class
+* Network traffic
+* Runtime duration
+* Storage consumption
+
+---
+
+## Cost Management Recommendation
+
+This environment should be destroyed when not actively used.
+
+Cleanup command:
+
+```bash
+./scripts/cleanup/destroy-environment.sh
+```
+
+Automated teardown is included to reduce unnecessary AWS charges and support responsible cloud cost management.
+
+---
+
 # Cost Design Philosophy
 
 This project intentionally prioritizes learning production architecture patterns over creating the lowest-cost AWS environment.

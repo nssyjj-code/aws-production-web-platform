@@ -2,153 +2,280 @@
 
 ## Overview
 
-This project implements a highly available three-tier web platform in AWS spanning multiple Availability Zones. The environment is deployed entirely through AWS CLI automation and consists of a public load balancing tier, a private application tier, and a private database tier.
+The AWS Production Web Platform is a highly available three-tier web application environment deployed within AWS.
 
-### Architecture Goals
+The platform is designed to demonstrate production-style cloud architecture patterns, including:
 
-* High availability across multiple Availability Zones
-* Separation of network tiers using private subnets
-* Horizontal application scaling through Auto Scaling Groups
-* Secure database isolation
-* Full environment lifecycle automation (deployment and teardown)
-* Production-oriented networking and security practices
+* Multi-AZ deployment
+* Load-balanced application traffic
+* Auto Scaling compute resources
+* Managed database services
+* Private network segmentation
+* Infrastructure lifecycle automation
+
+The environment is provisioned and managed using AWS CLI automation.
 
 ---
 
-## Network Architecture
+# Architecture Goals
 
-The environment is deployed within a dedicated VPC using the CIDR range:
+The platform was designed with the following objectives:
+
+* High availability
+* Secure network segmentation
+* Horizontal scalability
+* Operational simplicity
+* Infrastructure automation
+* Cost awareness
+
+---
+
+# High-Level Architecture
+
+The environment consists of three primary tiers:
 
 ```text
-10.0.0.0/16
+Presentation Tier
+        |
+        v
+Application Tier
+        |
+        v
+Data Tier
 ```
 
-Resources are distributed across two Availability Zones to improve fault tolerance and reduce single points of failure.
+AWS services:
 
-### Public Tier
-
-Public subnets host internet-facing infrastructure:
-
-* Application Load Balancer (ALB)
-* NAT Gateways
-
-These resources receive inbound internet traffic and provide controlled access to internal services.
-
-### Application Tier
-
-Application servers are deployed into private subnets and managed by an Auto Scaling Group.
-
-Characteristics:
-
-* No public IP addresses
-* No direct inbound internet access
-* Traffic accepted only from the Application Load Balancer
-* Outbound internet access provided through NAT Gateways
-
-### Database Tier
-
-Amazon Aurora MySQL is deployed into dedicated private database subnets.
-
-Characteristics:
-
-* Not publicly accessible
-* Accessible only from application servers
-* Isolated from direct internet traffic
-* Deployed across multiple Availability Zones
+| Tier         | Service                   |
+| ------------ | ------------------------- |
+| Presentation | Application Load Balancer |
+| Application  | EC2 Auto Scaling Group    |
+| Data         | Aurora MySQL              |
 
 ---
 
-## Traffic Flow
+# Component Architecture
 
 ```text
 Internet
-    ↓
+    |
+    v
 Application Load Balancer
-    ↓
+    |
+    v
 Target Group
-    ↓
+    |
+    v
 Auto Scaling Group
-    ↓
+    |
+    v
 EC2 Application Instances
-    ↓
-Aurora MySQL
+    |
+    v
+Aurora MySQL Cluster
 ```
 
 ---
 
-## Security Design
+# Core Components
 
-The environment follows a layered security model.
+## Application Load Balancer
 
-### Load Balancer Security Group
+Responsibilities:
 
-Allowed:
+* Public application entry point
+* Traffic distribution
+* Health monitoring
+* High availability across Availability Zones
 
-* HTTP (80) from the internet
+Benefits:
 
-### Application Security Group
-
-Allowed:
-
-* HTTP (80) from the ALB Security Group
-
-Denied:
-
-* Direct internet access
-
-### Database Security Group
-
-Allowed:
-
-* MySQL (3306) from the Application Security Group
-
-Denied:
-
-* Public access
+* Eliminates single-instance dependency
+* Improves fault tolerance
+* Supports horizontal scaling
 
 ---
 
-## High Availability Design
+## Auto Scaling Group
 
-High availability is achieved through:
+Responsibilities:
 
-* Multi-AZ subnet deployment
-* Multiple NAT Gateways
-* Application Load Balancer spanning both Availability Zones
-* Auto Scaling Group deployment across Availability Zones
-* Aurora cluster deployment across multiple Availability Zones
+* Instance lifecycle management
+* Capacity management
+* Automatic instance replacement
+* Multi-AZ deployment
 
-If a single Availability Zone becomes unavailable, application traffic can continue to be served from healthy resources in the remaining zone.
+Configuration:
 
----
+```text
+Minimum Capacity: 2
+Desired Capacity: 2
+Maximum Capacity: 4
+```
 
-## Design Decisions
+Benefits:
 
-### Why Private Application Subnets?
-
-Application instances do not require direct internet exposure. Restricting them to private subnets reduces attack surface and follows AWS security best practices.
-
-### Why Separate NAT Gateways?
-
-A NAT Gateway is deployed in each Availability Zone to reduce cross-AZ dependencies and improve resilience during infrastructure failures.
-
-### Why Aurora MySQL?
-
-Aurora provides managed database operations, automated backups, and high availability while maintaining MySQL compatibility.
-
-### Why an Application Load Balancer?
-
-The ALB distributes traffic across multiple instances and integrates directly with Auto Scaling Groups and health checks.
+* Improved availability
+* Automatic recovery
+* Scalable application layer
 
 ---
 
-## Operational Considerations
+## EC2 Application Tier
 
-The platform includes automation for the complete infrastructure lifecycle:
+Application servers process user requests and business logic.
 
-* Environment deployment
-* Resource configuration
-* Service validation
-* Environment teardown
+Characteristics:
 
-Destroy operations include dependency-aware cleanup to ensure resources are removed in the correct order and AWS dependency constraints are respected.
+* Private deployment
+* Managed by Auto Scaling
+* No direct internet exposure
+* Receives traffic only from the ALB
+
+---
+
+## Aurora MySQL
+
+Aurora provides the relational database layer.
+
+Responsibilities:
+
+* Data persistence
+* Managed database operations
+* Backup management
+* High availability support
+
+Characteristics:
+
+* Private deployment
+* No public accessibility
+* Restricted network access
+
+---
+
+# Traffic Flow
+
+User requests follow this path:
+
+```text
+Internet
+    |
+    v
+Application Load Balancer
+    |
+    v
+Application Instance
+    |
+    v
+Aurora Database
+```
+
+Response flow:
+
+```text
+Aurora Database
+    |
+    v
+Application Instance
+    |
+    v
+Application Load Balancer
+    |
+    v
+User
+```
+
+---
+
+# Availability Strategy
+
+The environment is designed to reduce single points of failure.
+
+Availability measures include:
+
+* Multi-AZ deployment
+* Load-balanced traffic distribution
+* Auto Scaling instance replacement
+* Managed database platform
+* Redundant networking components
+
+Benefits:
+
+* Improved resiliency
+* Fault isolation
+* Reduced service interruption
+
+---
+
+# Security Model
+
+The platform follows a layered security approach.
+
+Security controls include:
+
+* Private application subnets
+* Private database subnets
+* Security group isolation
+* IAM roles for AWS access
+* No public database exposure
+
+Detailed security controls are documented in:
+
+```text
+docs/governance/security.md
+```
+
+---
+
+# Network Architecture Reference
+
+This document focuses on application architecture.
+
+Detailed networking design is documented separately:
+
+```text
+docs/architecture/network-design.md
+```
+
+Topics include:
+
+* VPC design
+* CIDR planning
+* Subnet strategy
+* Route tables
+* NAT Gateways
+* Internet Gateway configuration
+
+---
+
+# Operational Lifecycle
+
+Infrastructure lifecycle automation includes:
+
+* Deployment automation
+* Environment validation
+* Operational runbooks
+* Incident response procedures
+* Automated environment cleanup
+
+Supporting documentation:
+
+```text
+deployment/deployment-guide.md
+operations/operational-runbook.md
+operations/incident-scenarios.md
+```
+
+---
+
+# Summary
+
+The AWS Production Web Platform demonstrates a production-style three-tier architecture that emphasizes:
+
+* Availability
+* Security
+* Scalability
+* Automation
+* Operational maintainability
+
+The design intentionally mirrors common cloud architecture patterns used in enterprise AWS environments while remaining practical for a development and portfolio environment.

@@ -26,42 +26,9 @@ Infrastructure components deployed:
 
 ---
 
-# Deployment Workflow
-
-Infrastructure is deployed in dependency order to ensure resources exist before dependent services are created.
-
-Deployment flow:
-
-```text
-Authentication
-      |
-      v
-Configuration Loading
-      |
-      v
-Networking Layer
-      |
-      v
-Security Layer
-      |
-      v
-Compute Layer
-      |
-      v
-Load Balancing Layer
-      |
-      v
-Database Layer
-      |
-      v
-Validation
-```
-
----
-
 # Prerequisites
 
-Before deployment, verify the following tools and access requirements.
+Before deployment, verify the following tools, access requirements, and configuration settings.
 
 Required:
 
@@ -73,19 +40,64 @@ Required:
 
 ---
 
-## AWS CLI Validation
+## Required Tools
 
-Verify AWS CLI installation:
+| Tool    | Required Version |
+| ------- | ---------------- |
+| AWS CLI | v2.x             |
+| Git     | 2.x              |
+| Bash    | 4.x or newer     |
+
+Validate installations:
 
 ```bash
 aws --version
+git --version
+bash --version
 ```
 
 Expected:
 
 ```text
 aws-cli/2.x
+git version 2.x
+GNU bash 4.x or newer
 ```
+
+---
+
+## AWS Account Requirements
+
+The deployment provisions:
+
+* Amazon VPC
+* Public and private subnets
+* Internet Gateway
+* NAT Gateways
+* Security Groups
+* IAM Roles
+* Application Load Balancer
+* Auto Scaling Group
+* EC2 Instances
+* Aurora MySQL
+
+Ensure the AWS account has sufficient service quotas and permissions before deployment.
+
+---
+
+## IAM Permissions
+
+The deployment identity requires permissions to create and manage:
+
+* EC2 resources
+* Elastic Load Balancing resources
+* Auto Scaling resources
+* Aurora resources
+* IAM roles and instance profiles
+
+For development environments, AdministratorAccess is acceptable.
+
+Production environments should follow least-privilege principles.
 
 ---
 
@@ -125,6 +137,33 @@ Infrastructure deployment should only be performed after verifying the active AW
 
 ---
 
+# Cost Awareness
+
+This project provisions production-style AWS infrastructure.
+
+Resources that contribute most significantly to cost include:
+
+* NAT Gateways
+* Aurora MySQL
+* EC2 instances
+* Application Load Balancer
+
+Development environments should be destroyed when not actively used.
+
+Cleanup:
+
+```bash
+./scripts/cleanup/destroy-environment.sh
+```
+
+Detailed cost analysis and optimization strategies are documented in:
+
+```text
+docs/governance/cost-optimization.md
+```
+
+---
+
 # Region Configuration
 
 Default deployment region:
@@ -143,7 +182,7 @@ aws configure get region
 
 # Environment Configuration
 
-Deployment variables are managed through:
+Deployment settings are stored in:
 
 ```text
 config/environment.conf
@@ -151,14 +190,19 @@ config/environment.conf
 
 Configuration values include:
 
-* AWS region
-* Resource naming
-* Network CIDR ranges
-* Instance configuration
+* AWS Region
+* Resource names
+* CIDR ranges
+* Auto Scaling settings
 * Database configuration
-* Scaling configuration
 
-Deployment scripts load this file during execution.
+Review configuration values before deployment.
+
+The deployment automation loads configuration directly from this file.
+
+Avoid modifying deployment scripts to change environment settings.
+
+Configuration should remain separated from automation logic.
 
 ---
 
