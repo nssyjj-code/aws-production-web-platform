@@ -5,6 +5,10 @@
 
 set -euo pipefail
 
+export AWS_PAGER=""
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
 run_step() {
   local script="$1"
 
@@ -13,23 +17,37 @@ run_step() {
   echo "Running: $script"
   echo "=================================================="
 
+  if [[ ! -f "$script" ]]; then
+    echo "[ERROR] Missing script: $script"
+    exit 1
+  fi
+
+  if [[ ! -x "$script" ]]; then
+    echo "[ERROR] Script is not executable: $script"
+    echo "Run: chmod +x $script"
+    exit 1
+  fi
+
   "$script"
 }
 
-run_step "./scripts/deploy/01-create-vpc.sh"
-run_step "./scripts/deploy/02-create-subnets.sh"
-run_step "./scripts/deploy/03-create-internet-gateway.sh"
-run_step "./scripts/deploy/04-create-route-tables.sh"
-run_step "./scripts/deploy/05-create-nat-gateways.sh"
-run_step "./scripts/deploy/06-create-security-groups.sh"
-run_step "./scripts/deploy/07-create-ec2-iam-role.sh"
-run_step "./scripts/deploy/08-create-launch-template.sh"
-run_step "./scripts/deploy/09-create-target-group.sh"
-run_step "./scripts/deploy/10-create-load-balancer.sh"
-run_step "./scripts/deploy/11-create-auto-scaling-group.sh"
-run_step "./scripts/deploy/12-create-rds-subnet-group.sh"
-run_step "./scripts/deploy/13-create-aurora-cluster.sh"
-run_step "./scripts/deploy/14-create-aurora-instance.sh"
+run_step "$ROOT_DIR/scripts/setup/01-verify-environment.sh"
+run_step "$ROOT_DIR/scripts/setup/02-configure-aws.sh"
+
+run_step "$ROOT_DIR/scripts/deploy/01-create-vpc.sh"
+run_step "$ROOT_DIR/scripts/deploy/02-create-subnets.sh"
+run_step "$ROOT_DIR/scripts/deploy/03-create-internet-gateway.sh"
+run_step "$ROOT_DIR/scripts/deploy/04-create-route-tables.sh"
+run_step "$ROOT_DIR/scripts/deploy/05-create-nat-gateways.sh"
+run_step "$ROOT_DIR/scripts/deploy/06-create-security-groups.sh"
+run_step "$ROOT_DIR/scripts/deploy/07-create-ec2-iam-role.sh"
+run_step "$ROOT_DIR/scripts/deploy/08-create-launch-template.sh"
+run_step "$ROOT_DIR/scripts/deploy/09-create-target-group.sh"
+run_step "$ROOT_DIR/scripts/deploy/10-create-load-balancer.sh"
+run_step "$ROOT_DIR/scripts/deploy/11-create-auto-scaling-group.sh"
+run_step "$ROOT_DIR/scripts/deploy/12-create-rds-subnet-group.sh"
+run_step "$ROOT_DIR/scripts/deploy/13-create-aurora-cluster.sh"
+run_step "$ROOT_DIR/scripts/deploy/14-create-aurora-instance.sh"
 
 echo
 echo "Deployment complete."

@@ -7,6 +7,16 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+CONFIG_FILE="$ROOT_DIR/config/environment.conf"
+
+if [[ ! -f "$CONFIG_FILE" ]]; then
+  echo "[ERROR] Missing config file: $CONFIG_FILE"
+  exit 1
+fi
+
+# shellcheck source=../../config/environment.conf
+source "$CONFIG_FILE"
 
 # shellcheck source=../lib/logging.sh
 source "$SCRIPT_DIR/../lib/logging.sh"
