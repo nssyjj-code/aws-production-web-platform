@@ -1,17 +1,21 @@
 #!/bin/bash
 
+log_timestamp() {
+  date '+%Y-%m-%d %H:%M:%S'
+}
+
 log_info() {
-    echo "[INFO] $1"
+  echo "[$(log_timestamp)] [INFO] $*"
 }
 
 log_success() {
-    echo "[SUCCESS] $1"
+  echo "[$(log_timestamp)] [SUCCESS] $*"
 }
 
 log_warning() {
-    echo "[WARNING] $1"
+  echo "[$(log_timestamp)] [WARNING] $*" >&2
 }
 
 log_error() {
-    echo "[ERROR] $1"
+  echo "[$(log_timestamp)] [ERROR] $*" >&2
 }
