@@ -4,25 +4,34 @@
 # Shared validation helpers for deployment scripts.
 
 validate_aws_cli() {
-  command -v aws >/dev/null 2>&1 || {
+  if ! command -v aws >/dev/null 2>&1; then
     log_error "AWS CLI is not installed."
     exit 1
-  }
+  fi
+}
+
+validate_jq() {
+  if ! command -v jq >/dev/null 2>&1; then
+    log_error "jq is not installed."
+    exit 1
+  fi
 }
 
 validate_aws_credentials() {
-  aws sts get-caller-identity --region "$AWS_REGION" >/dev/null 2>&1 || {
-    log_error "AWS credentials are invalid or expired."
+  if ! aws_cli sts get-caller-identity >/dev/null 2>&1; then
+    log_error "AWS credentials are invalid, expired, or not configured."
     exit 1
-  }
+  fi
 }
 
 log_aws_identity() {
+  local identity
   local account_id
   local caller_arn
 
-  account_id=$(aws sts get-caller-identity --query "Account" --output text)
-  caller_arn=$(aws sts get-caller-identity --query "Arn" --output text)
+  identity=$(aws_cli sts get-caller-identity --output json)
+  account_id=$(echo "$identity" | jq -r ".Account")
+  caller_arn=$(echo "$identity" | jq -r ".Arn")
 
   log_info "Deploying to AWS Account: $account_id"
   log_info "Authenticated as: $caller_arn"
@@ -33,14 +42,25 @@ require_id() {
   local resource_name="$2"
   local resource_id="$3"
 
-  if [[ "$resource_id" == "None" || -z "$resource_id" ]]; then
+  if ! exists "$resource_id"; then
     log_error "$resource_type not found: $resource_name"
+    exit 1
+  fi
+}
+
+validate_required_variable() {
+  local variable_name="$1"
+  local variable_value="${!variable_name:-}"
+
+  if [[ -z "$variable_value" ]]; then
+    log_error "Required variable is not set: $variable_name"
     exit 1
   fi
 }
 
 validate_prerequisites() {
   validate_aws_cli
+  validate_jq
   validate_aws_credentials
   log_aws_identity
 }
