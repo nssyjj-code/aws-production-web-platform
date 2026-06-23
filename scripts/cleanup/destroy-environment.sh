@@ -4,6 +4,8 @@
 
 set -euo pipefail
 
+export AWS_PAGER=""
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 CONFIG_FILE="$ROOT_DIR/config/environment.conf"
 

@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# 07-create-ec2-iam-role.sh
-# Creates the EC2 IAM role and instance profile for SSM-managed instances.
-
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -17,11 +14,20 @@ fi
 # shellcheck source=../../config/environment.conf
 source "$CONFIG_FILE"
 
+AWS_REGION="${AWS_REGION:-us-east-1}"
+export AWS_PAGER=""
+
 # shellcheck source=../lib/logging.sh
-source "$SCRIPT_DIR/../lib/logging.sh"
-source "$SCRIPT_DIR/config/environment.conf"
-source "$SCRIPT_DIR/../lib/validation.sh"
-source "$SCRIPT_DIR/../lib/iam.sh"
+source "$ROOT_DIR/scripts/lib/logging.sh"
+
+# shellcheck source=../lib/aws.sh
+source "$ROOT_DIR/scripts/lib/aws.sh"
+
+# shellcheck source=../lib/validation.sh
+source "$ROOT_DIR/scripts/lib/validation.sh"
+
+# shellcheck source=../lib/iam.sh
+source "$ROOT_DIR/scripts/lib/iam.sh"
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 TRUST_POLICY_PATH="$REPO_ROOT/policies/ec2-trust-policy.json"

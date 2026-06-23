@@ -5,11 +5,11 @@ log_timestamp() {
 }
 
 log_info() {
-  echo "[$(log_timestamp)] [INFO] $*"
+  echo "[$(log_timestamp)] [INFO] $*" >&2
 }
 
 log_success() {
-  echo "[$(log_timestamp)] [SUCCESS] $*"
+  echo "[$(log_timestamp)] [SUCCESS] $*" >&2
 }
 
 log_warning() {

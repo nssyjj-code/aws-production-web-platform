@@ -17,38 +17,50 @@ fi
 # shellcheck source=../../config/environment.conf
 source "$CONFIG_FILE"
 
+AWS_REGION="${AWS_REGION:-us-east-1}"
+ENVIRONMENT="${ENVIRONMENT:-development}"
+PROJECT_NAME="${PROJECT_NAME:-aws-production-web-platform}"
+
+AZ1="${AZ1:-us-east-1a}"
+AZ2="${AZ2:-us-east-1b}"
+
+VPC_NAME="${VPC_NAME:-$PROJECT_NAME-vpc}"
+
+PUBLIC_SUBNET_A_NAME="${PUBLIC_SUBNET_A_NAME:-$PROJECT_NAME-public-subnet-az1}"
+PUBLIC_SUBNET_B_NAME="${PUBLIC_SUBNET_B_NAME:-$PROJECT_NAME-public-subnet-az2}"
+
+PRIVATE_APP_SUBNET_A_NAME="${PRIVATE_APP_SUBNET_A_NAME:-$PROJECT_NAME-private-app-subnet-az1}"
+PRIVATE_APP_SUBNET_B_NAME="${PRIVATE_APP_SUBNET_B_NAME:-$PROJECT_NAME-private-app-subnet-az2}"
+
+PRIVATE_DB_SUBNET_A_NAME="${PRIVATE_DB_SUBNET_A_NAME:-$PROJECT_NAME-private-db-subnet-az1}"
+PRIVATE_DB_SUBNET_B_NAME="${PRIVATE_DB_SUBNET_B_NAME:-$PROJECT_NAME-private-db-subnet-az2}"
+
+PUBLIC_SUBNET_A_CIDR="${PUBLIC_SUBNET_A_CIDR:-10.0.1.0/24}"
+PUBLIC_SUBNET_B_CIDR="${PUBLIC_SUBNET_B_CIDR:-10.0.2.0/24}"
+
+PRIVATE_APP_SUBNET_A_CIDR="${PRIVATE_APP_SUBNET_A_CIDR:-10.0.11.0/24}"
+PRIVATE_APP_SUBNET_B_CIDR="${PRIVATE_APP_SUBNET_B_CIDR:-10.0.12.0/24}"
+
+PRIVATE_DB_SUBNET_A_CIDR="${PRIVATE_DB_SUBNET_A_CIDR:-10.0.21.0/24}"
+PRIVATE_DB_SUBNET_B_CIDR="${PRIVATE_DB_SUBNET_B_CIDR:-10.0.22.0/24}"
+
+export AWS_PAGER=""
+
 # shellcheck source=../lib/logging.sh
-source "$SCRIPT_DIR/../lib/logging.sh"
+source "$ROOT_DIR/scripts/lib/logging.sh"
 
-AWS_REGION="us-east-1"
-PROJECT_NAME="aws-production-web-platform"
-VPC_NAME="$PROJECT_NAME-vpc"
+# shellcheck source=../lib/aws.sh
+source "$ROOT_DIR/scripts/lib/aws.sh"
 
-AZ1="us-east-1a"
-AZ2="us-east-1b"
+# shellcheck source=../lib/validation.sh
+source "$ROOT_DIR/scripts/lib/validation.sh"
 
-command -v aws >/dev/null 2>&1 || {
-  log_error "AWS CLI is not installed."
-  exit 1
-}
-
-aws sts get-caller-identity --region "$AWS_REGION" >/dev/null 2>&1 || {
-  log_error "AWS credentials are invalid or expired."
-  exit 1
-}
+validate_prerequisites
 
 log_info "Retrieving VPC ID for $VPC_NAME..."
 
-VPC_ID=$(aws ec2 describe-vpcs \
-  --region "$AWS_REGION" \
-  --filters "Name=tag:Name,Values=$VPC_NAME" \
-  --query "Vpcs[0].VpcId" \
-  --output text)
-
-if [[ "$VPC_ID" == "None" || -z "$VPC_ID" ]]; then
-  log_error "VPC $VPC_NAME not found. Run 01-create-vpc.sh first."
-  exit 1
-fi
+VPC_ID=$(find_vpc_by_name "$VPC_NAME")
+require_id "VPC" "$VPC_NAME" "$VPC_ID"
 
 log_success "Found VPC: $VPC_ID"
 
@@ -57,43 +69,41 @@ create_subnet() {
   local cidr_block="$2"
   local availability_zone="$3"
   local tier="$4"
+  local map_public_ip="$5"
   local existing_subnet_id
   local subnet_id
 
   log_info "Checking subnet: $subnet_name"
 
-  existing_subnet_id=$(aws ec2 describe-subnets \
-    --region "$AWS_REGION" \
+  existing_subnet_id=$(aws_cli ec2 describe-subnets \
     --filters \
       "Name=vpc-id,Values=$VPC_ID" \
       "Name=tag:Name,Values=$subnet_name" \
       "Name=cidr-block,Values=$cidr_block" \
     --query "Subnets[0].SubnetId" \
-    --output text)
+    --output text 2>/dev/null || echo "None")
 
-  if [[ "$existing_subnet_id" != "None" && -n "$existing_subnet_id" ]]; then
+  if exists "$existing_subnet_id"; then
     subnet_id="$existing_subnet_id"
-    log_info "Subnet already exists: $subnet_name ($subnet_id)"
+    log_success "Subnet already exists: $subnet_name ($subnet_id)"
   else
     log_info "Creating subnet: $subnet_name"
 
-    subnet_id=$(aws ec2 create-subnet \
+    subnet_id=$(aws_cli ec2 create-subnet \
       --vpc-id "$VPC_ID" \
       --cidr-block "$cidr_block" \
       --availability-zone "$availability_zone" \
-      --region "$AWS_REGION" \
-      --tag-specifications "ResourceType=subnet,Tags=[{Key=Name,Value=$subnet_name},{Key=Project,Value=$PROJECT_NAME},{Key=Tier,Value=$tier}]" \
+      --tag-specifications "ResourceType=subnet,Tags=[{Key=Name,Value=$subnet_name},{Key=Project,Value=$PROJECT_NAME},{Key=Environment,Value=$ENVIRONMENT},{Key=ManagedBy,Value=aws-cli},{Key=Tier,Value=$tier}]" \
       --query "Subnet.SubnetId" \
       --output text)
 
     log_success "Created subnet: $subnet_name ($subnet_id)"
   fi
 
-  if [[ "$tier" == "public" ]]; then
+  if [[ "$map_public_ip" == "true" ]]; then
     log_info "Enabling auto-assign public IPv4 for $subnet_name"
 
-    aws ec2 modify-subnet-attribute \
-      --region "$AWS_REGION" \
+    aws_cli ec2 modify-subnet-attribute \
       --subnet-id "$subnet_id" \
       --map-public-ip-on-launch
 
@@ -101,13 +111,13 @@ create_subnet() {
   fi
 }
 
-create_subnet "$PROJECT_NAME-public-subnet-az1" "10.0.1.0/24" "$AZ1" "public"
-create_subnet "$PROJECT_NAME-public-subnet-az2" "10.0.2.0/24" "$AZ2" "public"
+create_subnet "$PUBLIC_SUBNET_A_NAME" "$PUBLIC_SUBNET_A_CIDR" "$AZ1" "public" "true"
+create_subnet "$PUBLIC_SUBNET_B_NAME" "$PUBLIC_SUBNET_B_CIDR" "$AZ2" "public" "true"
 
-create_subnet "$PROJECT_NAME-private-app-subnet-az1" "10.0.11.0/24" "$AZ1" "private-app"
-create_subnet "$PROJECT_NAME-private-app-subnet-az2" "10.0.12.0/24" "$AZ2" "private-app"
+create_subnet "$PRIVATE_APP_SUBNET_A_NAME" "$PRIVATE_APP_SUBNET_A_CIDR" "$AZ1" "private-app" "false"
+create_subnet "$PRIVATE_APP_SUBNET_B_NAME" "$PRIVATE_APP_SUBNET_B_CIDR" "$AZ2" "private-app" "false"
 
-create_subnet "$PROJECT_NAME-private-db-subnet-az1" "10.0.21.0/24" "$AZ1" "private-db"
-create_subnet "$PROJECT_NAME-private-db-subnet-az2" "10.0.22.0/24" "$AZ2" "private-db"
+create_subnet "$PRIVATE_DB_SUBNET_A_NAME" "$PRIVATE_DB_SUBNET_A_CIDR" "$AZ1" "private-db" "false"
+create_subnet "$PRIVATE_DB_SUBNET_B_NAME" "$PRIVATE_DB_SUBNET_B_CIDR" "$AZ2" "private-db" "false"
 
 log_success "Subnet setup complete."

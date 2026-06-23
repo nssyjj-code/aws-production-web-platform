@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# 14-create-aurora-instance.sh
-# Creates the Aurora MySQL writer instance.
-
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -17,17 +14,26 @@ fi
 # shellcheck source=../../config/environment.conf
 source "$CONFIG_FILE"
 
+AWS_REGION="${AWS_REGION:-us-east-1}"
+export AWS_PAGER=""
+
 # shellcheck source=../lib/logging.sh
-source "$SCRIPT_DIR/../lib/logging.sh"
-source "$SCRIPT_DIR/config/environment.conf"
-source "$SCRIPT_DIR/../lib/validation.sh"
-source "$SCRIPT_DIR/../lib/database.sh"
+source "$ROOT_DIR/scripts/lib/logging.sh"
+
+# shellcheck source=../lib/aws.sh
+source "$ROOT_DIR/scripts/lib/aws.sh"
+
+# shellcheck source=../lib/validation.sh
+source "$ROOT_DIR/scripts/lib/validation.sh"
+
+# shellcheck source=../lib/database.sh
+source "$ROOT_DIR/scripts/lib/database.sh"
 
 main() {
   validate_prerequisites
 
   log_info "Retrieving Aurora cluster..."
-  CLUSTER_ID=$(find_aurora_cluster_by_identifier "$AURORA_CLUSTER_IDENTIFIER")
+  CLUSTER_ID=$(find_db_cluster_by_identifier "$AURORA_CLUSTER_IDENTIFIER")
   require_id "Aurora Cluster" "$AURORA_CLUSTER_IDENTIFIER" "$CLUSTER_ID"
 
   log_info "Ensuring Aurora writer instance exists..."

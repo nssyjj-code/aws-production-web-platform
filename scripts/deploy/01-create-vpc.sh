@@ -17,59 +17,60 @@ fi
 # shellcheck source=../../config/environment.conf
 source "$CONFIG_FILE"
 
+AWS_REGION="${AWS_REGION:-us-east-1}"
+ENVIRONMENT="${ENVIRONMENT:-development}"
+PROJECT_NAME="${PROJECT_NAME:-aws-production-web-platform}"
+VPC_CIDR="${VPC_CIDR:-10.0.0.0/16}"
+VPC_NAME="${VPC_NAME:-$PROJECT_NAME-vpc}"
+
+export AWS_PAGER=""
+
 # shellcheck source=../lib/logging.sh
-source "$SCRIPT_DIR/../lib/logging.sh"
+source "$ROOT_DIR/scripts/lib/logging.sh"
 
-AWS_REGION="us-east-1"
-VPC_CIDR="10.0.0.0/16"
-PROJECT_NAME="aws-production-web-platform"
-VPC_NAME="$PROJECT_NAME-vpc"
+# shellcheck source=../lib/aws.sh
+source "$ROOT_DIR/scripts/lib/aws.sh"
 
-command -v aws >/dev/null 2>&1 || {
-  log_error "AWS CLI is not installed."
-  exit 1
-}
+# shellcheck source=../lib/validation.sh
+source "$ROOT_DIR/scripts/lib/validation.sh"
 
-aws sts get-caller-identity --region "$AWS_REGION" >/dev/null 2>&1 || {
-  log_error "AWS credentials are invalid or expired."
-  exit 1
-}
+validate_prerequisites
 
 log_info "Checking for existing VPC..."
 
-EXISTING_VPC_ID=$(aws ec2 describe-vpcs \
-  --region "$AWS_REGION" \
+EXISTING_VPC_ID=$(aws_cli ec2 describe-vpcs \
   --filters "Name=tag:Name,Values=$VPC_NAME" "Name=cidr-block,Values=$VPC_CIDR" \
   --query "Vpcs[0].VpcId" \
-  --output text)
+  --output text 2>/dev/null || echo "None")
 
-if [[ "$EXISTING_VPC_ID" != "None" ]]; then
-  log_info "VPC already exists: $EXISTING_VPC_ID"
-  log_success "No changes made."
+if exists "$EXISTING_VPC_ID"; then
+  log_success "VPC already exists: $VPC_NAME ($EXISTING_VPC_ID)"
   exit 0
 fi
 
-log_info "Creating VPC..."
+log_info "Creating VPC: $VPC_NAME"
 
-VPC_ID=$(aws ec2 create-vpc \
+VPC_ID=$(aws_cli ec2 create-vpc \
   --cidr-block "$VPC_CIDR" \
-  --region "$AWS_REGION" \
-  --tag-specifications "ResourceType=vpc,Tags=[{Key=Name,Value=$VPC_NAME},{Key=Project,Value=$PROJECT_NAME}]" \
+  --tag-specifications "ResourceType=vpc,Tags=[{Key=Name,Value=$VPC_NAME},{Key=Project,Value=$PROJECT_NAME},{Key=Environment,Value=$ENVIRONMENT},{Key=ManagedBy,Value=aws-cli}]" \
   --query "Vpc.VpcId" \
   --output text)
 
-log_info "VPC created: $VPC_ID"
+log_success "Created VPC: $VPC_ID"
 
 log_info "Configuring VPC DNS settings..."
 
-aws ec2 modify-vpc-attribute \
+aws_cli ec2 modify-vpc-attribute \
   --vpc-id "$VPC_ID" \
-  --enable-dns-support "{\"Value\":true}" \
-  --region "$AWS_REGION"
+  --enable-dns-support '{"Value":true}'
 
-aws ec2 modify-vpc-attribute \
+aws_cli ec2 modify-vpc-attribute \
   --vpc-id "$VPC_ID" \
-  --enable-dns-hostnames "{\"Value\":true}" \
-  --region "$AWS_REGION"
+  --enable-dns-hostnames '{"Value":true}'
 
-log_success "VPC setup complete: $VPC_ID"
+log_info "Waiting for VPC to become available..."
+
+aws_cli ec2 wait vpc-available \
+  --vpc-ids "$VPC_ID"
+
+log_success "VPC setup complete: $VPC_NAME ($VPC_ID)"

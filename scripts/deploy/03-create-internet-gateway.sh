@@ -2,7 +2,6 @@
 
 # 03-create-internet-gateway.sh
 # Creates and attaches an Internet Gateway for the AWS Production Web Platform VPC.
-# This script is idempotent and safe to rerun.
 
 set -euo pipefail
 
@@ -18,62 +17,44 @@ fi
 # shellcheck source=../../config/environment.conf
 source "$CONFIG_FILE"
 
+AWS_REGION="${AWS_REGION:-us-east-1}"
+ENVIRONMENT="${ENVIRONMENT:-development}"
+PROJECT_NAME="${PROJECT_NAME:-aws-production-web-platform}"
+VPC_NAME="${VPC_NAME:-$PROJECT_NAME-vpc}"
+IGW_NAME="${IGW_NAME:-$PROJECT_NAME-igw}"
+
+export AWS_PAGER=""
+
 # shellcheck source=../lib/logging.sh
-source "$SCRIPT_DIR/../lib/logging.sh"
+source "$ROOT_DIR/scripts/lib/logging.sh"
 
-AWS_REGION="us-east-1"
-PROJECT_NAME="aws-production-web-platform"
+# shellcheck source=../lib/aws.sh
+source "$ROOT_DIR/scripts/lib/aws.sh"
 
-VPC_NAME="$PROJECT_NAME-vpc"
-IGW_NAME="$PROJECT_NAME-igw"
-
-validate_prerequisites() {
-  command -v aws >/dev/null 2>&1 || {
-    log_error "AWS CLI is not installed."
-    exit 1
-  }
-
-  aws sts get-caller-identity --region "$AWS_REGION" >/dev/null 2>&1 || {
-    log_error "AWS credentials are invalid or expired."
-    exit 1
-  }
-}
-
-get_vpc_id() {
-  aws ec2 describe-vpcs \
-    --region "$AWS_REGION" \
-    --filters "Name=tag:Name,Values=$VPC_NAME" \
-    --query "Vpcs[0].VpcId" \
-    --output text
-}
-
-get_existing_igw() {
-  aws ec2 describe-internet-gateways \
-    --region "$AWS_REGION" \
-    --filters "Name=attachment.vpc-id,Values=$VPC_ID" \
-    --query "InternetGateways[0].InternetGatewayId" \
-    --output text
-}
+# shellcheck source=../lib/validation.sh
+source "$ROOT_DIR/scripts/lib/validation.sh"
 
 create_igw() {
-  aws ec2 create-internet-gateway \
-    --region "$AWS_REGION" \
-    --tag-specifications "ResourceType=internet-gateway,Tags=[{Key=Name,Value=$IGW_NAME},{Key=Project,Value=$PROJECT_NAME}]" \
+  aws_cli ec2 create-internet-gateway \
+    --tag-specifications "ResourceType=internet-gateway,Tags=[{Key=Name,Value=$IGW_NAME},{Key=Project,Value=$PROJECT_NAME},{Key=Environment,Value=$ENVIRONMENT},{Key=ManagedBy,Value=aws-cli}]" \
     --query "InternetGateway.InternetGatewayId" \
     --output text
 }
 
 attach_igw() {
-  aws ec2 attach-internet-gateway \
-    --region "$AWS_REGION" \
-    --internet-gateway-id "$IGW_ID" \
-    --vpc-id "$VPC_ID" >/dev/null
+  local igw_id="$1"
+  local vpc_id="$2"
+
+  aws_cli ec2 attach-internet-gateway \
+    --internet-gateway-id "$igw_id" \
+    --vpc-id "$vpc_id" >/dev/null
 }
 
 verify_igw_attachment() {
-  aws ec2 describe-internet-gateways \
-    --region "$AWS_REGION" \
-    --internet-gateway-ids "$IGW_ID" \
+  local igw_id="$1"
+
+  aws_cli ec2 describe-internet-gateways \
+    --internet-gateway-ids "$igw_id" \
     --query "InternetGateways[0].Attachments[0].VpcId" \
     --output text
 }
@@ -82,41 +63,40 @@ main() {
   validate_prerequisites
 
   log_info "Retrieving VPC ID for $VPC_NAME..."
-  VPC_ID=$(get_vpc_id)
+  local vpc_id
+  vpc_id=$(find_vpc_by_name "$VPC_NAME")
+  require_id "VPC" "$VPC_NAME" "$vpc_id"
 
-  if [[ "$VPC_ID" == "None" || -z "$VPC_ID" ]]; then
-    log_error "VPC $VPC_NAME not found. Run 01-create-vpc.sh first."
-    exit 1
-  fi
+  log_success "Found VPC: $vpc_id"
 
-  log_success "Found VPC: $VPC_ID"
+  log_info "Checking for existing Internet Gateway attached to $vpc_id..."
+  local igw_id
+  igw_id=$(find_igw_by_vpc_id "$vpc_id")
 
-  log_info "Checking for existing Internet Gateway attached to $VPC_ID..."
-  IGW_ID=$(get_existing_igw)
-
-  if [[ "$IGW_ID" == "None" || -z "$IGW_ID" ]]; then
+  if ! exists "$igw_id"; then
     log_info "No Internet Gateway found. Creating one..."
-    IGW_ID=$(create_igw)
+    igw_id=$(create_igw)
 
-    log_success "Created Internet Gateway: $IGW_ID"
+    log_success "Created Internet Gateway: $igw_id"
 
-    log_info "Attaching Internet Gateway $IGW_ID to VPC $VPC_ID..."
-    attach_igw
+    log_info "Attaching Internet Gateway $igw_id to VPC $vpc_id..."
+    attach_igw "$igw_id" "$vpc_id"
 
-    log_success "Attached Internet Gateway $IGW_ID to VPC $VPC_ID"
+    log_success "Attached Internet Gateway $igw_id to VPC $vpc_id"
   else
-    log_success "Internet Gateway already exists and is attached: $IGW_ID"
+    log_success "Internet Gateway already exists and is attached: $igw_id"
   fi
 
   log_info "Verifying Internet Gateway attachment..."
-  ATTACHED_VPC_ID=$(verify_igw_attachment)
+  local attached_vpc_id
+  attached_vpc_id=$(verify_igw_attachment "$igw_id")
 
-  if [[ "$ATTACHED_VPC_ID" != "$VPC_ID" ]]; then
-    log_error "Internet Gateway verification failed. Expected $VPC_ID but found $ATTACHED_VPC_ID."
+  if [[ "$attached_vpc_id" != "$vpc_id" ]]; then
+    log_error "Internet Gateway verification failed. Expected $vpc_id but found $attached_vpc_id."
     exit 1
   fi
 
-  log_success "Internet Gateway is correctly attached to VPC $VPC_ID."
+  log_success "Internet Gateway is correctly attached to VPC $vpc_id."
 }
 
 main "$@"

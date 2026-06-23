@@ -20,7 +20,6 @@ source "$CONFIG_FILE"
 # shellcheck source=../lib/logging.sh
 source "$SCRIPT_DIR/../lib/logging.sh"
 source "$SCRIPT_DIR/../lib/logging.sh"
-source "$SCRIPT_DIR/config/environment.conf"
 source "$SCRIPT_DIR/../lib/validation.sh"
 source "$SCRIPT_DIR/../lib/aws.sh"
 source "$SCRIPT_DIR/../lib/networking.sh"
