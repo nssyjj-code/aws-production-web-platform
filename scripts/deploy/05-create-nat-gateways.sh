@@ -5,11 +5,15 @@
 
 set -euo pipefail
 
-source "$(dirname "$0")/../lib/logging.sh"
-source "$(dirname "$0")/../../config/environment.conf"
-source "$(dirname "$0")/../lib/validation.sh"
-source "$(dirname "$0")/../lib/aws.sh"
-source "$(dirname "$0")/../lib/networking.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# shellcheck source=../lib/logging.sh
+source "$SCRIPT_DIR/../lib/logging.sh"
+source "$SCRIPT_DIR/../lib/logging.sh"
+source "$SCRIPT_DIR/../config/environment.conf"
+source "$SCRIPT_DIR/../lib/validation.sh"
+source "$SCRIPT_DIR/../lib/aws.sh"
+source "$SCRIPT_DIR/../lib/networking.sh"
 
 main() {
   validate_prerequisites

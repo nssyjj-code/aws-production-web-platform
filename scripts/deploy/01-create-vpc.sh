@@ -5,7 +5,10 @@
 
 set -euo pipefail
 
-source "$(dirname "$0")/../lib/logging.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# shellcheck source=../lib/logging.sh
+source "$SCRIPT_DIR/../lib/logging.sh"
 
 AWS_REGION="us-east-1"
 VPC_CIDR="10.0.0.0/16"

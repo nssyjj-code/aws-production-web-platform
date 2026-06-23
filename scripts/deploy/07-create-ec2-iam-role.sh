@@ -5,10 +5,13 @@
 
 set -euo pipefail
 
-source "$(dirname "$0")/../lib/logging.sh"
-source "$(dirname "$0")/../../config/environment.conf"
-source "$(dirname "$0")/../lib/validation.sh"
-source "$(dirname "$0")/../lib/iam.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# shellcheck source=../lib/logging.sh
+source "$SCRIPT_DIR/../lib/logging.sh"
+source "$SCRIPT_DIR/../config/environment.conf"
+source "$SCRIPT_DIR/../lib/validation.sh"
+source "$SCRIPT_DIR/../lib/iam.sh"
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 TRUST_POLICY_PATH="$REPO_ROOT/policies/ec2-trust-policy.json"
