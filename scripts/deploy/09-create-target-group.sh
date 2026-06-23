@@ -17,25 +17,44 @@ fi
 # shellcheck source=../../config/environment.conf
 source "$CONFIG_FILE"
 
+AWS_REGION="${AWS_REGION:-us-east-1}"
+TARGET_GROUP_HEALTH_CHECK_PATH="${TARGET_GROUP_HEALTH_CHECK_PATH:-/}"
+
+export AWS_PAGER=""
+
 # shellcheck source=../lib/logging.sh
-source "$SCRIPT_DIR/../lib/logging.sh"
-source "$SCRIPT_DIR/../lib/validation.sh"
-source "$SCRIPT_DIR/../lib/aws.sh"
-source "$SCRIPT_DIR/../lib/load-balancing.sh"
+source "$ROOT_DIR/scripts/lib/logging.sh"
+
+# shellcheck source=../lib/aws.sh
+source "$ROOT_DIR/scripts/lib/aws.sh"
+
+# shellcheck source=../lib/validation.sh
+source "$ROOT_DIR/scripts/lib/validation.sh"
+
+# shellcheck source=../lib/load-balancing.sh
+source "$ROOT_DIR/scripts/lib/load-balancing.sh"
 
 main() {
   validate_prerequisites
 
   log_info "Retrieving VPC ID..."
-  VPC_ID=$(find_vpc_by_name "$VPC_NAME")
-  require_id "VPC" "$VPC_NAME" "$VPC_ID"
-  log_success "Found VPC: $VPC_ID"
+  local vpc_id
+  vpc_id=$(find_vpc_by_name "$VPC_NAME")
+  require_id "VPC" "$VPC_NAME" "$vpc_id"
+  log_success "Found VPC: $vpc_id"
 
   log_info "Ensuring target group exists..."
-  TARGET_GROUP_ARN=$(ensure_target_group "$TARGET_GROUP_NAME" "$VPC_ID" "HTTP" 80)
-  require_id "Target Group" "$TARGET_GROUP_NAME" "$TARGET_GROUP_ARN"
+  local target_group_arn
+  target_group_arn=$(ensure_target_group \
+    "$TARGET_GROUP_NAME" \
+    "$vpc_id" \
+    "HTTP" \
+    80 \
+    "$TARGET_GROUP_HEALTH_CHECK_PATH")
 
-  log_success "Target group configured successfully: $TARGET_GROUP_ARN"
+  require_id "Target Group" "$TARGET_GROUP_NAME" "$target_group_arn"
+
+  log_success "Target group configured successfully: $target_group_arn"
 }
 
 main "$@"

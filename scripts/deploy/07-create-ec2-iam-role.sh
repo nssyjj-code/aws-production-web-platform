@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# 07-create-ec2-iam-role.sh
+# Creates the EC2 IAM role and instance profile used by application instances.
+
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -15,6 +18,8 @@ fi
 source "$CONFIG_FILE"
 
 AWS_REGION="${AWS_REGION:-us-east-1}"
+SSM_MANAGED_POLICY_ARN="${SSM_MANAGED_POLICY_ARN:-arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore}"
+
 export AWS_PAGER=""
 
 # shellcheck source=../lib/logging.sh
@@ -29,8 +34,7 @@ source "$ROOT_DIR/scripts/lib/validation.sh"
 # shellcheck source=../lib/iam.sh
 source "$ROOT_DIR/scripts/lib/iam.sh"
 
-REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-TRUST_POLICY_PATH="$REPO_ROOT/policies/ec2-trust-policy.json"
+TRUST_POLICY_PATH="$ROOT_DIR/policies/ec2-trust-policy.json"
 
 main() {
   validate_prerequisites
@@ -41,15 +45,17 @@ main() {
   fi
 
   log_info "Ensuring EC2 IAM role exists..."
-  ROLE_NAME=$(ensure_ec2_role "$EC2_ROLE_NAME" "$TRUST_POLICY_PATH")
-  require_id "IAM Role" "$EC2_ROLE_NAME" "$ROLE_NAME"
+  local role_name
+  role_name=$(ensure_ec2_role "$EC2_ROLE_NAME" "$TRUST_POLICY_PATH")
+  require_id "IAM Role" "$EC2_ROLE_NAME" "$role_name"
 
   log_info "Ensuring SSM policy is attached..."
   ensure_role_policy_attachment "$EC2_ROLE_NAME" "$SSM_MANAGED_POLICY_ARN"
 
   log_info "Ensuring EC2 instance profile exists..."
-  INSTANCE_PROFILE_NAME=$(ensure_instance_profile "$EC2_INSTANCE_PROFILE_NAME")
-  require_id "Instance Profile" "$EC2_INSTANCE_PROFILE_NAME" "$INSTANCE_PROFILE_NAME"
+  local instance_profile_name
+  instance_profile_name=$(ensure_instance_profile "$EC2_INSTANCE_PROFILE_NAME")
+  require_id "Instance Profile" "$EC2_INSTANCE_PROFILE_NAME" "$instance_profile_name"
 
   log_info "Ensuring role is added to instance profile..."
   ensure_role_in_instance_profile "$EC2_INSTANCE_PROFILE_NAME" "$EC2_ROLE_NAME"

@@ -17,14 +17,24 @@ fi
 # shellcheck source=../../config/environment.conf
 source "$CONFIG_FILE"
 
-# shellcheck source=../lib/logging.sh
-source "$SCRIPT_DIR/../lib/logging.sh"
-source "$SCRIPT_DIR/../lib/validation.sh"
-source "$SCRIPT_DIR/../lib/aws.sh"
-source "$SCRIPT_DIR/../lib/compute.sh"
+AWS_REGION="${AWS_REGION:-us-east-1}"
+INSTANCE_TYPE="${INSTANCE_TYPE:-t3.micro}"
 
-REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-USER_DATA_FILE="$REPO_ROOT/user-data/app-server.sh"
+export AWS_PAGER=""
+
+# shellcheck source=../lib/logging.sh
+source "$ROOT_DIR/scripts/lib/logging.sh"
+
+# shellcheck source=../lib/aws.sh
+source "$ROOT_DIR/scripts/lib/aws.sh"
+
+# shellcheck source=../lib/validation.sh
+source "$ROOT_DIR/scripts/lib/validation.sh"
+
+# shellcheck source=../lib/compute.sh
+source "$ROOT_DIR/scripts/lib/compute.sh"
+
+USER_DATA_FILE="$ROOT_DIR/user-data/app-server.sh"
 
 main() {
   validate_prerequisites
@@ -35,30 +45,35 @@ main() {
   fi
 
   log_info "Retrieving application security group..."
-  VPC_ID=$(find_vpc_by_name "$VPC_NAME")
-  require_id "VPC" "$VPC_NAME" "$VPC_ID"
+  local vpc_id
+  local app_sg_id
 
-  APP_SG_ID=$(find_security_group_by_name "$VPC_ID" "$APP_SG_NAME")
-  require_id "Security Group" "$APP_SG_NAME" "$APP_SG_ID"
-  log_success "Found application security group: $APP_SG_ID"
+  vpc_id=$(find_vpc_by_name "$VPC_NAME")
+  require_id "VPC" "$VPC_NAME" "$vpc_id"
+
+  app_sg_id=$(find_security_group_by_name "$vpc_id" "$APP_SG_NAME")
+  require_id "Security Group" "$APP_SG_NAME" "$app_sg_id"
+  log_success "Found application security group: $app_sg_id"
 
   log_info "Retrieving latest Amazon Linux 2023 AMI..."
-  AMI_ID=$(find_latest_amazon_linux_2023_ami)
-  require_id "AMI" "Amazon Linux 2023" "$AMI_ID"
-  log_success "Using AMI: $AMI_ID"
+  local ami_id
+  ami_id=$(find_latest_amazon_linux_2023_ami)
+  require_id "AMI" "Amazon Linux 2023" "$ami_id"
+  log_success "Using AMI: $ami_id"
 
   log_info "Ensuring launch template exists..."
-  LAUNCH_TEMPLATE_ID=$(ensure_launch_template \
+  local launch_template_id
+  launch_template_id=$(ensure_launch_template \
     "$LAUNCH_TEMPLATE_NAME" \
-    "$AMI_ID" \
+    "$ami_id" \
     "$INSTANCE_TYPE" \
-    "$APP_SG_ID" \
+    "$app_sg_id" \
     "$EC2_INSTANCE_PROFILE_NAME" \
     "$USER_DATA_FILE")
 
-  require_id "Launch Template" "$LAUNCH_TEMPLATE_NAME" "$LAUNCH_TEMPLATE_ID"
+  require_id "Launch Template" "$LAUNCH_TEMPLATE_NAME" "$launch_template_id"
 
-  log_success "Launch template configured successfully: $LAUNCH_TEMPLATE_ID"
+  log_success "Launch template configured successfully: $launch_template_id"
 }
 
 main "$@"

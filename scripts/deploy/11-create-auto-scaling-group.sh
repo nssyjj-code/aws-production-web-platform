@@ -17,50 +17,64 @@ fi
 # shellcheck source=../../config/environment.conf
 source "$CONFIG_FILE"
 
+AWS_REGION="${AWS_REGION:-us-east-1}"
+export AWS_PAGER=""
+
 # shellcheck source=../lib/logging.sh
-source "$SCRIPT_DIR/../lib/logging.sh"
-source "$SCRIPT_DIR/../lib/validation.sh"
-source "$SCRIPT_DIR/../lib/aws.sh"
-source "$SCRIPT_DIR/../lib/load-balancing.sh"
-source "$SCRIPT_DIR/../lib/autoscaling.sh"
-source "$SCRIPT_DIR/../lib/autoscaling.sh"
+source "$ROOT_DIR/scripts/lib/logging.sh"
+
+# shellcheck source=../lib/aws.sh
+source "$ROOT_DIR/scripts/lib/aws.sh"
+
+# shellcheck source=../lib/validation.sh
+source "$ROOT_DIR/scripts/lib/validation.sh"
+
+# shellcheck source=../lib/autoscaling.sh
+source "$ROOT_DIR/scripts/lib/autoscaling.sh"
 
 main() {
   validate_prerequisites
 
   log_info "Retrieving VPC ID..."
-  VPC_ID=$(find_vpc_by_name "$VPC_NAME")
-  require_id "VPC" "$VPC_NAME" "$VPC_ID"
-  log_success "Found VPC: $VPC_ID"
+  local vpc_id
+  vpc_id=$(find_vpc_by_name "$VPC_NAME")
+  require_id "VPC" "$VPC_NAME" "$vpc_id"
+  log_success "Found VPC: $vpc_id"
 
   log_info "Retrieving private application subnet IDs..."
-  PRIVATE_APP_SUBNET_A_ID=$(find_subnet_by_name "$VPC_ID" "$PRIVATE_APP_SUBNET_A_NAME")
-  PRIVATE_APP_SUBNET_B_ID=$(find_subnet_by_name "$VPC_ID" "$PRIVATE_APP_SUBNET_B_NAME")
+  local private_app_subnet_a_id
+  local private_app_subnet_b_id
 
-  require_id "Private App Subnet" "$PRIVATE_APP_SUBNET_A_NAME" "$PRIVATE_APP_SUBNET_A_ID"
-  require_id "Private App Subnet" "$PRIVATE_APP_SUBNET_B_NAME" "$PRIVATE_APP_SUBNET_B_ID"
+  private_app_subnet_a_id=$(find_subnet_by_name "$vpc_id" "$PRIVATE_APP_SUBNET_A_NAME")
+  private_app_subnet_b_id=$(find_subnet_by_name "$vpc_id" "$PRIVATE_APP_SUBNET_B_NAME")
 
-  log_success "Found private app subnets: $PRIVATE_APP_SUBNET_A_ID, $PRIVATE_APP_SUBNET_B_ID"
+  require_id "Private App Subnet" "$PRIVATE_APP_SUBNET_A_NAME" "$private_app_subnet_a_id"
+  require_id "Private App Subnet" "$PRIVATE_APP_SUBNET_B_NAME" "$private_app_subnet_b_id"
+
+  log_success "Found private app subnets"
 
   log_info "Retrieving target group..."
-  TARGET_GROUP_ARN=$(find_target_group_by_name "$TARGET_GROUP_NAME")
-  require_id "Target Group" "$TARGET_GROUP_NAME" "$TARGET_GROUP_ARN"
-  log_success "Found target group: $TARGET_GROUP_ARN"
+  local target_group_arn
+  target_group_arn=$(find_target_group_by_name "$TARGET_GROUP_NAME")
+  require_id "Target Group" "$TARGET_GROUP_NAME" "$target_group_arn"
+  log_success "Found target group"
 
   log_info "Retrieving launch template..."
-  LAUNCH_TEMPLATE_ID=$(find_launch_template_by_name "$LAUNCH_TEMPLATE_NAME")
-  require_id "Launch Template" "$LAUNCH_TEMPLATE_NAME" "$LAUNCH_TEMPLATE_ID"
-  log_success "Found launch template: $LAUNCH_TEMPLATE_ID"
+  local launch_template_id
+  launch_template_id=$(find_launch_template_by_name "$LAUNCH_TEMPLATE_NAME")
+  require_id "Launch Template" "$LAUNCH_TEMPLATE_NAME" "$launch_template_id"
+  log_success "Found launch template: $launch_template_id"
 
   log_info "Ensuring Auto Scaling Group exists..."
-  ASG_RESULT=$(ensure_auto_scaling_group \
+  local asg_result
+  asg_result=$(ensure_auto_scaling_group \
     "$ASG_NAME" \
     "$LAUNCH_TEMPLATE_NAME" \
-    "$PRIVATE_APP_SUBNET_A_ID" \
-    "$PRIVATE_APP_SUBNET_B_ID" \
-    "$TARGET_GROUP_ARN")
+    "$private_app_subnet_a_id" \
+    "$private_app_subnet_b_id" \
+    "$target_group_arn")
 
-  require_id "Auto Scaling Group" "$ASG_NAME" "$ASG_RESULT"
+  require_id "Auto Scaling Group" "$ASG_NAME" "$asg_result"
 
   log_success "Auto Scaling Group configured successfully: $ASG_NAME"
 }

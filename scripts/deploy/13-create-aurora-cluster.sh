@@ -17,43 +17,52 @@ fi
 # shellcheck source=../../config/environment.conf
 source "$CONFIG_FILE"
 
+AWS_REGION="${AWS_REGION:-us-east-1}"
+export AWS_PAGER=""
+
 # shellcheck source=../lib/logging.sh
-source "$SCRIPT_DIR/../lib/logging.sh"
-source "$SCRIPT_DIR/../lib/validation.sh"
-source "$SCRIPT_DIR/../lib/aws.sh"
-source "$SCRIPT_DIR/../lib/database.sh"
+source "$ROOT_DIR/scripts/lib/logging.sh"
+
+# shellcheck source=../lib/aws.sh
+source "$ROOT_DIR/scripts/lib/aws.sh"
+
+# shellcheck source=../lib/validation.sh
+source "$ROOT_DIR/scripts/lib/validation.sh"
+
+# shellcheck source=../lib/database.sh
+source "$ROOT_DIR/scripts/lib/database.sh"
 
 main() {
   validate_prerequisites
-
-  if [[ -z "${DB_MASTER_USERNAME:-}" || -z "${DB_MASTER_PASSWORD:-}" ]]; then
-    log_error "DB_MASTER_USERNAME and DB_MASTER_PASSWORD must be set."
-    exit 1
-  fi
+  validate_database_credentials
 
   log_info "Retrieving VPC ID..."
-  VPC_ID=$(find_vpc_by_name "$VPC_NAME")
-  require_id "VPC" "$VPC_NAME" "$VPC_ID"
+  local vpc_id
+  vpc_id=$(find_vpc_by_name "$VPC_NAME")
+  require_id "VPC" "$VPC_NAME" "$vpc_id"
 
   log_info "Retrieving DB security group..."
-  DB_SG_ID=$(find_security_group_by_name "$VPC_ID" "$DB_SG_NAME")
-  require_id "Security Group" "$DB_SG_NAME" "$DB_SG_ID"
+  local db_sg_id
+  db_sg_id=$(find_security_group_by_name "$vpc_id" "$DB_SG_NAME")
+  require_id "Security Group" "$DB_SG_NAME" "$db_sg_id"
 
   log_info "Retrieving DB subnet group..."
-  DB_SUBNET_GROUP_RESULT=$(find_db_subnet_group_by_name "$DB_SUBNET_GROUP_NAME")
-  require_id "DB Subnet Group" "$DB_SUBNET_GROUP_NAME" "$DB_SUBNET_GROUP_RESULT"
+  local db_subnet_group_result
+  db_subnet_group_result=$(find_db_subnet_group_by_name "$DB_SUBNET_GROUP_NAME")
+  require_id "DB Subnet Group" "$DB_SUBNET_GROUP_NAME" "$db_subnet_group_result"
 
   log_info "Ensuring Aurora cluster exists..."
-  CLUSTER_ID=$(ensure_aurora_cluster \
+  local cluster_id
+  cluster_id=$(ensure_aurora_cluster \
     "$AURORA_CLUSTER_IDENTIFIER" \
     "$DB_SUBNET_GROUP_NAME" \
-    "$DB_SG_ID")
+    "$db_sg_id")
 
-  require_id "Aurora Cluster" "$AURORA_CLUSTER_IDENTIFIER" "$CLUSTER_ID"
+  require_id "Aurora Cluster" "$AURORA_CLUSTER_IDENTIFIER" "$cluster_id"
 
-  wait_for_aurora_cluster "$CLUSTER_ID"
+  wait_for_aurora_cluster "$cluster_id"
 
-  log_success "Aurora cluster configured successfully: $CLUSTER_ID"
+  log_success "Aurora cluster configured successfully: $cluster_id"
 }
 
 main "$@"

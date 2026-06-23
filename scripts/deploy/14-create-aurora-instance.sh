@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# 14-create-aurora-instance.sh
+# Creates the Aurora writer instance for the private Aurora MySQL cluster.
+
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -33,16 +36,18 @@ main() {
   validate_prerequisites
 
   log_info "Retrieving Aurora cluster..."
-  CLUSTER_ID=$(find_db_cluster_by_identifier "$AURORA_CLUSTER_IDENTIFIER")
-  require_id "Aurora Cluster" "$AURORA_CLUSTER_IDENTIFIER" "$CLUSTER_ID"
+  local cluster_id
+  cluster_id=$(find_db_cluster_by_identifier "$AURORA_CLUSTER_IDENTIFIER")
+  require_id "Aurora Cluster" "$AURORA_CLUSTER_IDENTIFIER" "$cluster_id"
 
   log_info "Ensuring Aurora writer instance exists..."
-  INSTANCE_ID=$(ensure_aurora_instance "$AURORA_WRITER_INSTANCE_IDENTIFIER" "$CLUSTER_ID")
-  require_id "Aurora Instance" "$AURORA_WRITER_INSTANCE_IDENTIFIER" "$INSTANCE_ID"
+  local instance_id
+  instance_id=$(ensure_aurora_instance "$AURORA_WRITER_INSTANCE_IDENTIFIER" "$cluster_id")
+  require_id "Aurora Instance" "$AURORA_WRITER_INSTANCE_IDENTIFIER" "$instance_id"
 
-  wait_for_aurora_instance "$INSTANCE_ID"
+  wait_for_aurora_instance "$instance_id"
 
-  log_success "Aurora writer instance configured successfully: $INSTANCE_ID"
+  log_success "Aurora writer instance configured successfully: $instance_id"
 }
 
 main "$@"
