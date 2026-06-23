@@ -1,6 +1,6 @@
 # Architecture
 
-## Overview
+# Architecture Overview
 
 The AWS Production Web Platform is a highly available three-tier web application environment deployed within AWS.
 
@@ -14,6 +14,12 @@ The platform is designed to demonstrate production-style cloud architecture patt
 * Infrastructure lifecycle automation
 
 The environment is provisioned and managed using AWS CLI automation.
+
+---
+
+## Architecture Diagram
+
+![Architecture Diagram](./diagrams/architecture.svg)
 
 ---
 
