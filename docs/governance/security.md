@@ -2,41 +2,116 @@
 
 ## Overview
 
-This document describes the security architecture and controls implemented for the AWS Production Web Platform.
+This document describes the security architecture, controls, and design principles implemented within the AWS Production Web Platform.
 
-The environment follows a defense-in-depth approach by applying security controls across multiple layers:
+The platform follows a defense-in-depth approach that applies security controls across multiple layers of the environment including:
 
-* Network isolation
+* Network security
 * Identity and access management
-* Least privilege access
-* Secure administrative access
+* Administrative access
 * Database protection
 * Credential management
+* Monitoring and detection
+* Encryption
+* Operational governance
 
-Security decisions are based on AWS cloud security best practices and the principle of least privilege.
+Security decisions are based on AWS security best practices, the AWS Shared Responsibility Model, and the principle of least privilege.
+
+---
+
+# Security Objectives
+
+The platform was designed to achieve the following security objectives:
+
+* Minimize public attack surface
+* Enforce least-privilege access
+* Protect sensitive resources
+* Reduce credential exposure
+* Secure administrative access
+* Support operational auditing
+* Enable future security enhancements
 
 ---
 
 # Security Architecture
 
-The platform uses layered network security.
+The environment uses layered security controls.
 
 Traffic flow:
 
 ```text
 Internet
-    |
-    v
+    │
+    ▼
 Application Load Balancer
-    |
-    v
-EC2 Application Instances
-    |
-    v
-Aurora MySQL Database
+    │
+    ▼
+Private Application Tier
+    │
+    ▼
+Private Database Tier
 ```
 
-Each tier only accepts required traffic from the previous layer.
+Each layer only accepts explicitly authorized traffic.
+
+No component is granted broader access than required.
+
+---
+
+# Defense-in-Depth Strategy
+
+Security is implemented at multiple layers.
+
+```text
+User
+ │
+ ▼
+Application Load Balancer
+ │
+ ▼
+Security Groups
+ │
+ ▼
+Private Subnets
+ │
+ ▼
+IAM Controls
+ │
+ ▼
+Database Controls
+```
+
+Security does not rely on any single control.
+
+Multiple overlapping protections reduce overall risk exposure.
+
+---
+
+# AWS Shared Responsibility Model
+
+The platform follows the AWS Shared Responsibility Model.
+
+### AWS Responsibilities
+
+AWS secures:
+
+* Physical infrastructure
+* Data centers
+* Networking hardware
+* Hypervisor layer
+* Managed service infrastructure
+
+### Customer Responsibilities
+
+This project secures:
+
+* IAM configuration
+* Security groups
+* Application configuration
+* Database configuration
+* Secrets management
+* Monitoring configuration
+* Administrative access controls
 
 ---
 
@@ -44,327 +119,463 @@ Each tier only accepts required traffic from the previous layer.
 
 ## Public Tier
 
-Resources:
+Public resources include:
 
 * Application Load Balancer
 * NAT Gateways
 
-The public tier contains resources that require internet connectivity.
-
-The Application Load Balancer is the only inbound entry point into the environment.
+The Application Load Balancer serves as the only inbound application entry point.
 
 Allowed inbound traffic:
 
 ```text
 Internet
-    |
-    v
+     │
+     ▼
 ALB Security Group
 
-HTTP 80
-HTTPS 443 (production enhancement)
+TCP 80
+TCP 443 (future enhancement)
 ```
 
-No application servers are directly exposed to the internet.
+No EC2 instances are directly reachable from the internet.
 
 ---
 
-# Application Tier Security
+## Application Tier Security
 
-Application instances are deployed inside private subnets.
+Application instances are deployed within private application subnets.
 
 Security controls:
 
 * No public IP addresses
-* No direct inbound internet access
-* Traffic accepted only from the ALB security group
+* No inbound internet access
+* Security group restrictions
+* Systems Manager administration
 
-Allowed inbound communication:
+Allowed communication:
 
 ```text
 ALB Security Group
-        |
-        v
+        │
+        ▼
 Application Security Group
 
-HTTP 80
+TCP 80
 ```
 
 Benefits:
 
 * Reduced attack surface
-* Controlled application access
-* Network segmentation
+* Controlled traffic paths
+* Strong network segmentation
 
 ---
 
-# Database Security
+## Database Tier Security
 
-Aurora MySQL is deployed in private database subnets.
+Aurora MySQL is deployed within dedicated private database subnets.
 
 Security controls:
 
-* Public accessibility disabled
-* No internet route
-* Access restricted through security groups
+* No public accessibility
+* No internet routing
+* Security group restrictions
+* Private subnet placement
 
 Allowed communication:
 
 ```text
 Application Security Group
-          |
-          v
+          │
+          ▼
 Database Security Group
 
 TCP 3306
 ```
 
-Blocked:
+Blocked communication:
 
 * Internet access
-* Direct user connections
-* Public database exposure
+* Direct user access
+* Public database endpoints
 
 ---
 
 # Security Group Strategy
 
-Security groups follow least privilege access.
+Security groups implement least-privilege network access.
+
+---
 
 ## Load Balancer Security Group
 
-Inbound:
+### Inbound
 
-| Source   | Protocol | Port |
-| -------- | -------- | ---- |
-| Internet | HTTP     | 80   |
+| Source   | Protocol | Port         |
+| -------- | -------- | ------------ |
+| Internet | TCP      | 80           |
+| Internet | TCP      | 443 (future) |
 
-Outbound:
+### Outbound
 
-| Destination      | Purpose                     |
-| ---------------- | --------------------------- |
-| Application Tier | Forward application traffic |
+| Destination      | Purpose         |
+| ---------------- | --------------- |
+| Application Tier | Forward traffic |
 
 ---
 
 ## Application Security Group
 
-Inbound:
+### Inbound
 
 | Source             | Protocol | Port |
 | ------------------ | -------- | ---- |
-| ALB Security Group | HTTP     | 80   |
+| ALB Security Group | TCP      | 80   |
 
-Outbound:
+### Outbound
 
-| Destination     | Purpose                |
-| --------------- | ---------------------- |
-| Aurora Database | Database communication |
-| NAT Gateway     | Software updates       |
+| Destination     | Purpose            |
+| --------------- | ------------------ |
+| Aurora Database | Database access    |
+| NAT Gateway     | Software updates   |
+| AWS Services    | Operational access |
 
 ---
 
 ## Database Security Group
 
-Inbound:
+### Inbound
 
 | Source                     | Protocol | Port |
 | -------------------------- | -------- | ---- |
-| Application Security Group | MySQL    | 3306 |
+| Application Security Group | TCP      | 3306 |
 
-Database access is controlled using security group references instead of broad CIDR ranges.
+Security group references are used instead of broad CIDR ranges wherever possible.
 
 ---
 
 # Identity and Access Management
 
-## EC2 IAM Role
+## EC2 IAM Role Design
 
-Application instances use:
+Application instances receive AWS permissions through IAM roles.
 
-* IAM Role
-* Instance Profile
+Architecture:
 
-This allows AWS service access without storing credentials on EC2 instances.
+```text
+EC2 Instance
+      │
+      ▼
+Instance Profile
+      │
+      ▼
+IAM Role
+      │
+      ▼
+AWS Services
+```
 
 Benefits:
 
-* Temporary AWS credentials
+* No embedded credentials
 * Automatic credential rotation
-* No hardcoded access keys
+* Reduced credential exposure
+* AWS best-practice implementation
+
+---
+
+## Least Privilege Philosophy
+
+Permissions should only grant access required to perform assigned responsibilities.
+
+Benefits:
+
+* Reduced blast radius
+* Improved auditability
+* Lower risk from compromised resources
 
 ---
 
 # Administrative Access
 
-Traditional SSH access is intentionally avoided.
+Traditional SSH administration is intentionally avoided.
 
 Not implemented:
 
 ```text
 Internet
-    |
-    v
+    │
+    ▼
 SSH Port 22
-    |
-    v
+    │
+    ▼
 EC2 Instance
 ```
 
-Reason:
+---
 
-Opening SSH increases administrative attack surface.
+## Systems Manager Access Model
 
-Preferred access method:
+Preferred administrative path:
 
 ```text
 Administrator
-      |
-      v
-AWS Systems Manager Session Manager
-      |
-      v
+       │
+       ▼
+IAM Authentication
+       │
+       ▼
+AWS Systems Manager
+       │
+       ▼
 Private EC2 Instance
 ```
 
 Benefits:
 
-* No inbound SSH required
-* IAM-controlled access
+* No SSH keys
+* No inbound ports
+* IAM-based access control
 * Session auditing support
+* Reduced attack surface
 
 ---
 
 # Credential Management
 
-The repository does not store secrets.
+The repository intentionally excludes all secrets.
 
-Not committed:
+Not stored:
 
 ```text
 AWS Access Keys
-Database passwords
-Private keys
-Configuration secrets
+Database Passwords
+Private Keys
+Session Tokens
+Application Secrets
 ```
 
-Development credentials are provided through environment variables.
+---
+
+## Database Credentials
+
+Development deployments use environment variables.
 
 Example:
 
 ```bash
-export DB_MASTER_USERNAME=<username>
-export DB_MASTER_PASSWORD=<password>
+export DB_MASTER_USERNAME="adminuser"
+export DB_MASTER_PASSWORD="strong-password"
 ```
 
-Production recommendation:
-
-Use AWS Secrets Manager for:
-
-* Database credentials
-* Application secrets
-* Automatic rotation
+These values are never committed to source control.
 
 ---
 
-# Encryption Considerations
+## Production Recommendation
+
+Production environments should use:
+
+```text
+AWS Secrets Manager
+```
+
+Benefits:
+
+* Centralized secrets management
+* Automatic rotation
+* Audit visibility
+* Reduced credential exposure
+
+---
+
+# Encryption Strategy
 
 ## Data in Transit
 
-Current:
+Current implementation:
 
-* Internal AWS communication through private networking
+* Private VPC networking
+* AWS-managed transport security
 
-Production enhancement:
-
-* HTTPS listener on Application Load Balancer
-* TLS certificate using AWS Certificate Manager
-
-Recommended:
+Future enhancement:
 
 ```text
 User
- |
+ │
 HTTPS
- |
-ALB
- |
-Application
+ │
+▼
+Application Load Balancer
+ │
+▼
+Application Tier
 ```
+
+Recommended implementation:
+
+* AWS Certificate Manager
+* TLS certificates
+* HTTPS listener
+* HTTP to HTTPS redirection
 
 ---
 
 ## Data at Rest
 
-Production recommendations:
-
-Enable encryption for:
+Recommended encryption targets:
 
 * Aurora storage
 * EBS volumes
-* Database backups
-* Application secrets
+* Database snapshots
+* Backup storage
+* Secrets
 
-AWS Key Management Service (KMS) should be used for encryption key management.
+Recommended service:
+
+```text
+AWS Key Management Service (KMS)
+```
+
+Benefits:
+
+* Centralized key management
+* Access control integration
+* Audit capabilities
 
 ---
 
-# Monitoring and Detection
+# Security Monitoring
 
-Recommended production monitoring:
+Security monitoring should provide visibility into infrastructure activity and configuration changes.
 
-## CloudTrail
+---
 
-Purpose:
-
-* API activity logging
-* Security auditing
-* Change tracking
-
-## CloudWatch
+## AWS CloudTrail
 
 Purpose:
 
-* Infrastructure monitoring
-* Operational alerts
-* Application visibility
+* API auditing
+* Administrative activity logging
+* Security investigations
+
+---
+
+## Amazon CloudWatch
+
+Purpose:
+
+* Operational monitoring
+* Alert generation
+* Security metric visibility
+
+---
 
 ## AWS Config
 
 Purpose:
 
 * Configuration compliance
-* Security drift detection
+* Drift detection
+* Continuous assessment
 
 ---
 
-# Security Improvements Roadmap
+## VPC Flow Logs
 
-Future enhancements:
+Future implementation:
 
-* HTTPS using AWS Certificate Manager
-* AWS WAF integration
-* Secrets Manager implementation
-* CloudTrail security auditing
-* AWS Config compliance checks
+Purpose:
+
+* Network visibility
+* Traffic analysis
+* Security investigations
+
+---
+
+# Security Control Matrix
+
+| Security Domain       | Control                                        |
+| --------------------- | ---------------------------------------------- |
+| Network Security      | Private subnet architecture                    |
+| Access Control        | IAM roles                                      |
+| Administrative Access | Systems Manager                                |
+| Database Security     | Private Aurora deployment                      |
+| Traffic Restriction   | Security groups                                |
+| Secrets Protection    | Environment variables / future Secrets Manager |
+| Monitoring            | CloudTrail, CloudWatch                         |
+| Future Compliance     | AWS Config                                     |
+
+---
+
+# Incident Response Considerations
+
+Security monitoring should support:
+
+* Unauthorized access investigations
+* IAM activity reviews
+* Configuration change analysis
+* Resource exposure validation
+* Network traffic analysis
+
+Additional guidance:
+
+```text
+docs/operations/incident-scenarios.md
+docs/operations/operational-runbook.md
+```
+
+---
+
+# Security Roadmap
+
+Planned future enhancements:
+
+* HTTPS enforcement
+* AWS Certificate Manager integration
+* AWS WAF
+* AWS Secrets Manager
+* CloudTrail deployment
+* AWS Config compliance monitoring
 * GuardDuty threat detection
 * VPC Flow Logs
-* Automated vulnerability scanning
-* CI/CD security checks
+* Vulnerability scanning
+* CI/CD security scanning
+* Security Hub integration
 
 ---
 
-# Security Summary
+# Related Architecture Decisions
 
-Security controls implemented:
+Relevant ADRs include:
 
-| Area                  | Implementation                   |
-| --------------------- | -------------------------------- |
-| Network isolation     | Public/private subnet separation |
-| Access control        | Security group references        |
-| Compute access        | IAM roles                        |
-| Administrative access | No public SSH exposure           |
-| Database protection   | Private Aurora deployment        |
-| Credential handling   | No hardcoded secrets             |
+```text
+ADR-003 Private Application Subnets
+ADR-005 Dual NAT Gateway Design
+ADR-008 Security Group Referencing
+ADR-012 Systems Manager Instead of SSH
+ADR-014 Aurora Private Deployment
+```
 
-The architecture reduces exposure by allowing only required communication paths between services while maintaining operational access through AWS-native security mechanisms.
+Reference:
+
+```text
+docs/architecture/architecture-decisions.md
+```
+
+---
+
+# Summary
+
+The AWS Production Web Platform implements layered security controls across networking, identity, administration, database protection, and operational monitoring.
+
+The design emphasizes:
+
+* Defense in depth
+* Least privilege access
+* Reduced attack surface
+* Secure administration
+* Future security extensibility
+
+The resulting architecture closely aligns with common security patterns used in modern AWS production environments while remaining practical for development and portfolio use.

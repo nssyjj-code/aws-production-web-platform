@@ -1,19 +1,19 @@
-# Architecture
+# AWS Production Web Platform Architecture
 
-# Architecture Overview
+## Executive Summary
 
-The AWS Production Web Platform is a highly available three-tier web application environment deployed within AWS.
+The AWS Production Web Platform is a production-style three-tier web application environment deployed entirely within AWS.
 
-The platform is designed to demonstrate production-style cloud architecture patterns, including:
+The platform demonstrates enterprise cloud architecture principles including:
 
-* Multi-AZ deployment
-* Load-balanced application traffic
-* Auto Scaling compute resources
-* Managed database services
-* Private network segmentation
-* Infrastructure lifecycle automation
+* High availability
+* Secure network segmentation
+* Horizontal scalability
+* Infrastructure automation
+* Operational monitoring
+* Disaster recovery planning
 
-The environment is provisioned and managed using AWS CLI automation.
+Infrastructure is provisioned through AWS CLI automation and follows repeatable deployment and validation processes.
 
 ---
 
@@ -23,93 +23,155 @@ The environment is provisioned and managed using AWS CLI automation.
 
 ---
 
-# Architecture Goals
+## Design Principles
 
-The platform was designed with the following objectives:
+The architecture was designed around the following principles:
 
-* High availability
-* Secure network segmentation
-* Horizontal scalability
-* Operational simplicity
-* Infrastructure automation
-* Cost awareness
+### High Availability
+
+Critical infrastructure components are deployed across multiple Availability Zones to reduce the impact of individual infrastructure failures.
+
+### Security by Default
+
+Application and database resources are isolated within private subnets and protected through layered security controls.
+
+### Infrastructure Automation
+
+All infrastructure resources are provisioned through version-controlled deployment scripts.
+
+### Operational Simplicity
+
+The platform uses managed AWS services where appropriate to reduce operational overhead.
+
+### Cost Awareness
+
+The environment balances production-style architecture patterns with practical cost management considerations.
 
 ---
 
-# High-Level Architecture
+## High-Level Architecture
 
-The environment consists of three primary tiers:
+The platform follows a traditional three-tier architecture.
 
 ```text
 Presentation Tier
-        |
-        v
+        │
+        ▼
 Application Tier
-        |
-        v
+        │
+        ▼
 Data Tier
 ```
 
-AWS services:
+### Service Mapping
 
-| Tier         | Service                   |
-| ------------ | ------------------------- |
-| Presentation | Application Load Balancer |
-| Application  | EC2 Auto Scaling Group    |
-| Data         | Aurora MySQL              |
+| Architecture Tier | AWS Service               |
+| ----------------- | ------------------------- |
+| Presentation      | Application Load Balancer |
+| Application       | EC2 Auto Scaling Group    |
+| Compute           | Amazon EC2                |
+| Database          | Amazon Aurora MySQL       |
+| Monitoring        | Amazon CloudWatch         |
+| Notifications     | Amazon SNS                |
+| Access Management | IAM & Systems Manager     |
 
 ---
 
-# Component Architecture
+## Physical Architecture
+
+### Region
+
+```text
+us-east-1
+```
+
+### VPC
+
+```text
+10.0.0.0/16
+```
+
+### Availability Zones
+
+```text
+us-east-1a
+us-east-1b
+```
+
+### Subnet Design
+
+| Tier                | Subnet Type             | Availability |
+| ------------------- | ----------------------- | ------------ |
+| Public              | ALB and NAT Gateways    | Multi-AZ     |
+| Private Application | EC2 Application Servers | Multi-AZ     |
+| Private Database    | Aurora MySQL            | Multi-AZ     |
+
+### Network Components
+
+The platform includes:
+
+* Internet Gateway
+* Public Route Table
+* Private Application Route Tables
+* Private Database Route Table
+* NAT Gateway AZ1
+* NAT Gateway AZ2
+
+Detailed network documentation:
+
+```text
+docs/architecture/network-design.md
+```
+
+---
+
+## Component Architecture
 
 ```text
 Internet
-    |
-    v
+    │
+    ▼
 Application Load Balancer
-    |
-    v
+    │
+    ▼
 Target Group
-    |
-    v
+    │
+    ▼
 Auto Scaling Group
-    |
-    v
+    │
+    ▼
 EC2 Application Instances
-    |
-    v
+    │
+    ▼
 Aurora MySQL Cluster
 ```
 
 ---
 
-# Core Components
+## Core Components
 
-## Application Load Balancer
+### Application Load Balancer
+
+The Application Load Balancer serves as the public entry point for all user traffic.
 
 Responsibilities:
 
-* Public application entry point
-* Traffic distribution
+* Request routing
 * Health monitoring
-* High availability across Availability Zones
+* Traffic distribution
+* High availability
 
 Benefits:
 
 * Eliminates single-instance dependency
-* Improves fault tolerance
 * Supports horizontal scaling
+* Integrates with Auto Scaling Groups
 
 ---
 
-## Auto Scaling Group
+### Auto Scaling Group
 
-Responsibilities:
-
-* Instance lifecycle management
-* Capacity management
-* Automatic instance replacement
-* Multi-AZ deployment
+The Auto Scaling Group manages application server lifecycle operations.
 
 Configuration:
 
@@ -119,113 +181,111 @@ Desired Capacity: 2
 Maximum Capacity: 4
 ```
 
-Benefits:
+Responsibilities:
 
-* Improved availability
-* Automatic recovery
-* Scalable application layer
+* Instance replacement
+* Capacity management
+* Multi-AZ distribution
+* Health-based recovery
 
 ---
 
-## EC2 Application Tier
+### EC2 Application Tier
 
-Application servers process user requests and business logic.
+Application servers execute application workloads and business logic.
 
 Characteristics:
 
 * Private deployment
+* No public IP addresses
 * Managed by Auto Scaling
-* No direct internet exposure
 * Receives traffic only from the ALB
 
 ---
 
-## Aurora MySQL
+### Aurora MySQL Cluster
 
-Aurora provides the relational database layer.
+Aurora MySQL provides the platform's relational database layer.
 
 Responsibilities:
 
-* Data persistence
-* Managed database operations
+* Persistent storage
 * Backup management
 * High availability support
+* Managed database operations
 
 Characteristics:
 
 * Private deployment
-* No public accessibility
 * Restricted network access
+* Storage encryption enabled
 
 ---
 
-# Traffic Flow
+## Traffic Flow
 
-User requests follow this path:
+### Request Path
 
 ```text
-Internet
-    |
-    v
+User
+  │
+  ▼
 Application Load Balancer
-    |
-    v
-Application Instance
-    |
-    v
-Aurora Database
+  │
+  ▼
+EC2 Application Instance
+  │
+  ▼
+Aurora MySQL Cluster
 ```
 
-Response flow:
+### Response Path
 
 ```text
-Aurora Database
-    |
-    v
+Aurora MySQL Cluster
+  │
+  ▼
 Application Instance
-    |
-    v
+  │
+  ▼
 Application Load Balancer
-    |
-    v
+  │
+  ▼
 User
 ```
 
 ---
 
-# Availability Strategy
+## Security Architecture
 
-The environment is designed to reduce single points of failure.
+The platform implements layered security controls.
 
-Availability measures include:
+### Network Security
 
-* Multi-AZ deployment
-* Load-balanced traffic distribution
-* Auto Scaling instance replacement
-* Managed database platform
-* Redundant networking components
+```text
+Internet
+    │
+    ▼
+ALB Security Group
+    │
+    ▼
+Application Security Group
+    │
+    ▼
+Database Security Group
+```
 
-Benefits:
-
-* Improved resiliency
-* Fault isolation
-* Reduced service interruption
-
----
-
-# Security Model
-
-The platform follows a layered security approach.
-
-Security controls include:
+### Security Controls
 
 * Private application subnets
 * Private database subnets
 * Security group isolation
-* IAM roles for AWS access
-* No public database exposure
+* IAM role-based access
+* No public database access
+* Systems Manager administration
+* No inbound SSH requirements
 
-Detailed security controls are documented in:
+Detailed security documentation:
 
 ```text
 docs/governance/security.md
@@ -233,55 +293,100 @@ docs/governance/security.md
 
 ---
 
-# Network Architecture Reference
+## Monitoring Architecture
 
-This document focuses on application architecture.
+Operational visibility is provided through native AWS monitoring services.
 
-Detailed networking design is documented separately:
+### Monitoring Components
+
+* CloudWatch Dashboards
+* CloudWatch Alarms
+* SNS Notifications
+
+### Monitored Resources
+
+* Application Load Balancer
+* Auto Scaling Group
+* EC2 Instances
+* Aurora Cluster
+* Aurora Instances
+
+Detailed monitoring documentation:
 
 ```text
-docs/architecture/network-design.md
+docs/operations/monitoring-strategy.md
 ```
-
-Topics include:
-
-* VPC design
-* CIDR planning
-* Subnet strategy
-* Route tables
-* NAT Gateways
-* Internet Gateway configuration
 
 ---
 
-# Operational Lifecycle
+## Availability Strategy
 
-Infrastructure lifecycle automation includes:
+The platform minimizes single points of failure through:
 
-* Deployment automation
-* Environment validation
-* Operational runbooks
+* Multi-AZ deployment
+* Load-balanced application traffic
+* Auto Scaling recovery
+* Managed database services
+* Redundant NAT Gateways
+
+Benefits:
+
+* Fault isolation
+* Service continuity
+* Automated recovery
+
+---
+
+## Operational Lifecycle
+
+The platform supports a complete infrastructure lifecycle.
+
+Capabilities include:
+
+* Automated deployment
+* Infrastructure validation
+* Monitoring and alerting
 * Incident response procedures
-* Automated environment cleanup
+* Automated environment destruction
 
 Supporting documentation:
 
 ```text
-deployment/deployment-guide.md
-operations/operational-runbook.md
-operations/incident-scenarios.md
+docs/deployment/deployment-guide.md
+docs/operations/operational-runbook.md
+docs/operations/incident-scenarios.md
 ```
 
 ---
 
-# Summary
+## Related Architecture Decisions
 
-The AWS Production Web Platform demonstrates a production-style three-tier architecture that emphasizes:
+Key design decisions are documented in:
+
+```text
+docs/architecture/architecture-decisions.md
+```
+
+Topics include:
+
+* Three-tier architecture
+* Multi-AZ deployment
+* Aurora adoption
+* Auto Scaling design
+* Monitoring strategy
+* Systems Manager access model
+
+---
+
+## Summary
+
+The AWS Production Web Platform demonstrates a production-style AWS architecture that emphasizes:
 
 * Availability
 * Security
 * Scalability
 * Automation
+* Monitoring
 * Operational maintainability
 
-The design intentionally mirrors common cloud architecture patterns used in enterprise AWS environments while remaining practical for a development and portfolio environment.
+The design intentionally mirrors common enterprise AWS deployment patterns while remaining practical for learning, demonstration, and portfolio purposes.

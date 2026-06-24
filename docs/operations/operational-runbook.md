@@ -2,60 +2,147 @@
 
 ## Overview
 
-This document provides operational procedures for monitoring, troubleshooting, and maintaining the AWS Production Web Platform.
+This runbook provides operational procedures for monitoring, troubleshooting, maintaining, and recovering the AWS Production Web Platform.
 
-The purpose of this runbook is to provide repeatable steps for diagnosing application availability, infrastructure health, and common failure scenarios.
+The objective is to provide repeatable operational guidance that enables engineers to quickly identify issues, restore service, and validate platform health.
 
-Architecture components covered:
+Covered services:
 
 * Application Load Balancer
-* Auto Scaling Group
-* EC2 application instances
-* Aurora MySQL database
-* VPC networking
-* Security groups
+* Target Groups
+* Auto Scaling Groups
+* EC2 Application Instances
+* Aurora MySQL
+* NAT Gateways
+* VPC Networking
+* Security Groups
+* IAM Components
 
 ---
 
-# Service Health Overview
+# Operational Objectives
 
-## Critical Components
+This runbook supports:
 
-| Component                 | Responsibility                              |
-| ------------------------- | ------------------------------------------- |
-| Application Load Balancer | Public traffic routing                      |
-| Target Group              | Application health validation               |
-| Auto Scaling Group        | Instance availability and scaling           |
-| EC2 Instances             | Application compute layer                   |
-| Aurora MySQL              | Database persistence                        |
-| NAT Gateway               | Outbound connectivity for private resources |
+* Incident response
+* Service recovery
+* Infrastructure troubleshooting
+* Operational maintenance
+* Post-incident validation
+
+The primary goal is to reduce Mean Time To Detect (MTTD) and Mean Time To Recover (MTTR).
+
+---
+
+# Service Inventory
+
+| Component                 | Responsibility                |
+| ------------------------- | ----------------------------- |
+| Application Load Balancer | Public traffic routing        |
+| Target Group              | Application health validation |
+| Auto Scaling Group        | Capacity management           |
+| EC2 Instances             | Application processing        |
+| Aurora MySQL              | Data persistence              |
+| NAT Gateway               | Outbound connectivity         |
+| Security Groups           | Traffic control               |
+| IAM Roles                 | AWS service permissions       |
+
+---
+
+# Incident Severity Model
+
+| Severity | Description               |
+| -------- | ------------------------- |
+| SEV-1    | Complete outage           |
+| SEV-2    | Major service degradation |
+| SEV-3    | Minor degradation         |
+| SEV-4    | Informational             |
+
+Severity should be determined based on customer impact and service availability.
+
+---
+
+# Incident Response Workflow
+
+When an incident occurs:
+
+```text
+Alert Received
+       │
+       ▼
+Acknowledge Incident
+       │
+       ▼
+Assess Impact
+       │
+       ▼
+Investigate Root Cause
+       │
+       ▼
+Apply Remediation
+       │
+       ▼
+Validate Recovery
+       │
+       ▼
+Document Findings
+```
 
 ---
 
 # Initial Incident Response Checklist
 
-When an application issue is reported:
+Perform the following checks before deep investigation.
 
-## Step 1 — Verify Load Balancer Health
-
-Check ALB status:
+## Verify AWS Identity
 
 ```bash
-aws elbv2 describe-load-balancers \
-  --names prod-web-app-alb
+aws sts get-caller-identity
 ```
 
-Verify:
+Confirm:
 
-* Load balancer state is active
-* Availability Zones are enabled
-* DNS name is reachable
+* Correct AWS account
+* Correct IAM identity
+* Expected permissions
 
 ---
 
-## Step 2 — Check Target Group Health
+## Verify Environment Health
 
-Verify registered targets:
+Execute:
+
+```bash
+./verify.sh
+```
+
+Confirm:
+
+* Load Balancer healthy
+* Auto Scaling healthy
+* Aurora available
+* Target health passing
+
+---
+
+# Load Balancer Operations
+
+## Verify ALB Health
+
+```bash
+aws elbv2 describe-load-balancers \
+  --names "$ALB_NAME"
+```
+
+Expected:
+
+```text
+State = active
+```
+
+---
+
+## Verify Target Health
 
 ```bash
 aws elbv2 describe-target-health \
@@ -71,23 +158,24 @@ TargetHealth.State = healthy
 Investigate:
 
 * unhealthy
+* initial
 * draining
 * unused
 
-Common causes:
+---
 
-* Application service stopped
-* Failed health checks
-* Security group restrictions
-* Instance failures
+## Common Causes
+
+* Failed application startup
+* Security group issues
+* Health check path failures
+* EC2 instance failures
 
 ---
 
-# EC2 Troubleshooting
+# EC2 Operations
 
-## Verify Instance State
-
-Check running instances:
+## Verify Running Instances
 
 ```bash
 aws ec2 describe-instances \
@@ -96,26 +184,28 @@ aws ec2 describe-instances \
 
 Confirm:
 
-* Instance running
+* Running state
 * Correct subnet placement
-* Status checks passing
+* Passed status checks
 
 ---
 
-## Check Instance Health
+## Verify Instance Health
 
 Review:
 
 * CPU utilization
-* Memory utilization
-* Disk usage
-* Application process status
+* Network traffic
+* Disk activity
+* Application processes
 
-Possible remediation:
+---
 
-Restart application services.
+## Replace Failed Instance
 
-Replace unhealthy instances through Auto Scaling:
+Allow Auto Scaling to replace failed instances automatically.
+
+Manual replacement:
 
 ```bash
 aws autoscaling terminate-instance-in-auto-scaling-group \
@@ -125,23 +215,16 @@ aws autoscaling terminate-instance-in-auto-scaling-group \
 
 ---
 
-# Auto Scaling Troubleshooting
+# Auto Scaling Operations
 
-Check Auto Scaling Group status:
+## Verify ASG Status
 
 ```bash
 aws autoscaling describe-auto-scaling-groups \
-  --auto-scaling-group-names prod-web-asg
+  --auto-scaling-group-names "$ASG_NAME"
 ```
 
-Validate:
-
-* Desired capacity
-* Minimum capacity
-* Maximum capacity
-* Instance lifecycle state
-
-Expected:
+Confirm:
 
 ```text
 LifecycleState = InService
@@ -150,67 +233,105 @@ HealthStatus = Healthy
 
 ---
 
-# Database Troubleshooting
-
-## Aurora Cluster Health
-
-Check database status:
+## Review Scaling Activities
 
 ```bash
-aws rds describe-db-clusters \
-  --db-cluster-identifier prod-aurora-cluster
+aws autoscaling describe-scaling-activities \
+  --auto-scaling-group-name "$ASG_NAME"
 ```
 
-Verify:
+Review:
 
-* Cluster available
-* Writer instance exists
-* No failover events occurring
+* Launch failures
+* Scaling events
+* Capacity changes
 
 ---
 
-## Connectivity Issues
+## Instance Refresh
 
-If EC2 cannot connect to Aurora:
+```bash
+aws autoscaling start-instance-refresh \
+  --auto-scaling-group-name "$ASG_NAME"
+```
 
-Validate:
+Use when:
 
-1. Aurora endpoint configuration
-2. Database security group rules
-3. Application security group permissions
-4. Database credentials
-5. Route table configuration
+* Launch template changes
+* Application updates
+* Fleet replacement
+
+---
+
+# Aurora Operations
+
+## Verify Cluster Status
+
+```bash
+aws rds describe-db-clusters \
+  --db-cluster-identifier "$AURORA_CLUSTER_IDENTIFIER"
+```
+
+Expected:
+
+```text
+Status = available
+```
+
+---
+
+## Verify Writer Instance
+
+```bash
+aws rds describe-db-instances \
+  --db-instance-identifier "$AURORA_WRITER_INSTANCE_IDENTIFIER"
+```
+
+Expected:
+
+```text
+DBInstanceStatus = available
+```
+
+---
+
+## Database Connectivity Validation
+
+Verify:
+
+* Aurora endpoint
+* Security group configuration
+* Credentials
+* Application connectivity
 
 Expected traffic flow:
 
 ```text
-EC2 Security Group
-        ↓
+Application Security Group
+          │
+          ▼
 Database Security Group
-        ↓
-Aurora MySQL :3306
+          │
+          ▼
+Aurora MySQL
 ```
 
 ---
 
-# Networking Troubleshooting
+# Networking Operations
 
-## Public Traffic Issues
-
-Validate:
-
-Internet Gateway
+## Verify Internet Gateway
 
 ```bash
 aws ec2 describe-internet-gateways
 ```
 
-Validate:
+Confirm:
 
 * Attached to VPC
-* Public routes exist
+* Active routes exist
 
-Expected public route:
+Expected route:
 
 ```text
 0.0.0.0/0 → Internet Gateway
@@ -218,19 +339,22 @@ Expected public route:
 
 ---
 
-## Private Internet Access Issues
-
-Check NAT Gateway:
+## Verify NAT Gateway
 
 ```bash
 aws ec2 describe-nat-gateways
 ```
 
-Validate:
+Expected:
 
-* NAT Gateway available
+```text
+State = available
+```
+
+Confirm:
+
 * Elastic IP attached
-* Private route tables configured
+* Route tables configured
 
 Expected private route:
 
@@ -240,138 +364,155 @@ Expected private route:
 
 ---
 
-# Security Group Troubleshooting
+# Security Operations
 
-Validate least-privilege communication:
+## Security Group Validation
 
-Internet:
+Expected traffic path:
 
 ```text
 Internet
- ↓
+    │
+    ▼
 ALB Security Group
-Port 80
-```
-
-Application:
-
-```text
-ALB Security Group
- ↓
+    │
+    ▼
 Application Security Group
-Port 80
-```
-
-Database:
-
-```text
-Application Security Group
- ↓
+    │
+    ▼
 Database Security Group
-Port 3306
 ```
 
-Avoid:
+Verify:
 
-* Opening SSH publicly
-* Exposing database ports externally
-* Using unrestricted inbound rules
+* No public SSH access
+* No public database access
+* Least-privilege rules remain intact
 
 ---
 
-# Scaling Events
+# Operational Maintenance
 
-During increased traffic:
+## Daily Tasks
 
-Expected behavior:
+Review:
 
-1. CloudWatch detects increased utilization
-2. Auto Scaling policy triggers
-3. New EC2 instances launch
-4. Instances register with Target Group
-5. ALB begins routing traffic
+* CloudWatch alarms
+* Target health
+* Aurora status
+* Auto Scaling health
 
-Validate scaling:
+---
 
-```bash
-aws autoscaling describe-scaling-activities \
-  --auto-scaling-group-name prod-web-asg
-```
+## Weekly Tasks
+
+Review:
+
+* Resource utilization
+* Security group changes
+* Scaling activity
+* Infrastructure drift
+
+---
+
+## Monthly Tasks
+
+Review:
+
+* Cost trends
+* Backup retention
+* Capacity planning
+* Architecture improvement opportunities
 
 ---
 
 # Recovery Procedures
 
-## Replace Failed Application Instance
+## Application Recovery
 
-Recommended:
+Steps:
 
-Allow Auto Scaling to replace failed instances automatically.
-
-Manual replacement:
-
-```bash
-aws autoscaling terminate-instance-in-auto-scaling-group \
-  --instance-id <id> \
-  --should-decrement-desired-capacity false
-```
+1. Verify ALB health
+2. Verify target health
+3. Review EC2 health
+4. Replace failed instances if required
+5. Validate application response
 
 ---
 
 ## Database Recovery
 
-Possible recovery actions:
+Steps:
 
-* Review Aurora events
-* Validate cluster status
-* Perform failover if required
-* Restore from snapshot if data loss occurs
+1. Verify Aurora status
+2. Review events
+3. Perform failover if required
+4. Restore snapshot if necessary
+5. Validate connectivity
 
----
+Additional guidance:
 
-# Preventative Monitoring
-
-Recommended production monitoring:
-
-## CloudWatch Metrics
-
-Monitor:
-
-Application Load Balancer:
-
-* HTTP 5XX errors
-* Target response time
-* Unhealthy host count
-
-EC2:
-
-* CPU utilization
-* Instance status checks
-
-Aurora:
-
-* CPU utilization
-* Database connections
-* Free storage
-* Read/write latency
+```text
+docs/operations/disaster-recovery.md
+```
 
 ---
 
-# Operational Improvements
+## Infrastructure Recovery
 
-Future improvements:
+Redeploy platform resources:
 
-* CloudWatch alarms
-* Centralized logging
-* Automated incident notifications
-* AWS Systems Manager Session Manager
-* CI/CD deployment validation
-* Infrastructure as Code migration
+```bash
+./deploy.sh
+```
+
+Validate:
+
+```bash
+./verify.sh
+```
+
+---
+
+# Post-Incident Activities
+
+Following service restoration:
+
+1. Document root cause
+2. Document remediation steps
+3. Identify preventative improvements
+4. Update runbooks if necessary
+5. Update monitoring if gaps were identified
+
+Incident examples:
+
+```text
+docs/operations/incident-response-scenarios.md
+```
+
+---
+
+# Related Documentation
+
+Operational references:
+
+```text
+docs/operations/monitoring-strategy.md
+docs/operations/disaster-recovery.md
+docs/operations/incident-response-scenarios.md
+```
+
+Architecture references:
+
+```text
+docs/architecture/architecture.md
+docs/architecture/network-design.md
+```
 
 ---
 
 # Summary
 
-This runbook documents operational procedures required to support a production-style AWS environment.
+This runbook provides operational guidance for maintaining, troubleshooting, recovering, and validating the AWS Production Web Platform.
 
-The focus is not only deploying infrastructure but maintaining reliability, troubleshooting failures, and operating cloud services after deployment.
+The objective is not only to deploy infrastructure, but to operate cloud services using repeatable procedures that improve reliability, reduce recovery time, and support production-style operations.

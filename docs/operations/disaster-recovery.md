@@ -4,29 +4,44 @@
 
 This document describes the disaster recovery (DR) strategy for the AWS Production Web Platform.
 
-The purpose of disaster recovery planning is to reduce service disruption and restore business functionality following infrastructure failures, application outages, or data loss events.
+The objective of disaster recovery planning is to restore critical services following infrastructure failures, application outages, configuration errors, or data loss events while minimizing business impact.
 
-The platform uses AWS managed services and multi-Availability Zone architecture to improve resiliency and simplify recovery operations.
+The platform leverages AWS managed services, multi-Availability Zone architecture, automated deployments, and infrastructure lifecycle automation to improve resiliency and simplify recovery operations.
+
+---
+
+# Disaster Recovery Objectives
+
+The primary goals of disaster recovery are:
+
+* Minimize service disruption
+* Restore critical infrastructure quickly
+* Protect application data
+* Reduce operational recovery complexity
+* Provide repeatable recovery procedures
+* Support recovery validation and testing
 
 ---
 
 # Recovery Objectives
 
-Disaster recovery planning is guided by two key objectives.
+Disaster recovery planning is guided by Recovery Time Objectives (RTO) and Recovery Point Objectives (RPO).
+
+---
 
 ## Recovery Time Objective (RTO)
 
-RTO defines the maximum acceptable downtime.
+RTO defines the maximum acceptable service downtime.
 
 Target:
 
 ```text
-Less than 60 minutes
+Less than 60 Minutes
 ```
 
 Meaning:
 
-The platform should be recoverable within one hour of a major outage.
+The platform should be restored to an operational state within one hour of a significant outage.
 
 ---
 
@@ -37,42 +52,85 @@ RPO defines the maximum acceptable data loss.
 Target:
 
 ```text
-Less than 15 minutes
+Less than 15 Minutes
 ```
 
 Meaning:
 
-No more than 15 minutes of data should be lost during recovery.
+Recovery procedures should limit potential data loss to no more than fifteen minutes.
 
-Actual RPO depends on Aurora backup configuration and recovery strategy.
+Actual RPO depends on:
+
+* Aurora backup configuration
+* Snapshot frequency
+* Recovery method
+* Failure scenario
 
 ---
 
 # Disaster Recovery Scope
 
-The recovery strategy covers:
+The disaster recovery plan covers:
 
-* Application Load Balancer
-* Auto Scaling Group
-* EC2 instances
-* Aurora MySQL
 * VPC networking
+* Internet Gateway
+* NAT Gateways
+* Route tables
+* Security groups
 * IAM resources
+* Application Load Balancer
+* Target Groups
+* Auto Scaling Groups
+* EC2 instances
+* Aurora MySQL resources
 * Deployment automation
 
-Excluded:
+Excluded scenarios:
 
-* AWS regional outages requiring multi-region failover
-* Third-party service failures
-* End-user devices
+* Complete AWS regional outages
+* Third-party SaaS failures
+* End-user device failures
+* Internet provider outages
+
+---
+
+# Disaster Recovery Assumptions
+
+The recovery strategy assumes:
+
+* AWS services remain operational within the Region
+* AWS account access remains available
+* Deployment automation remains accessible
+* Source code repository remains available
+* Infrastructure configuration remains version controlled
+
+These assumptions influence achievable recovery timelines.
+
+---
+
+# Service Recovery Priority
+
+Recovery efforts should prioritize services in the following order.
+
+| Priority | Service                   |
+| -------- | ------------------------- |
+| 1        | Aurora Database           |
+| 2        | Application Load Balancer |
+| 3        | Application Tier          |
+| 4        | Networking Components     |
+| 5        | Administrative Services   |
+
+Application availability depends on successful restoration of database services.
 
 ---
 
 # High Availability Features
 
-The platform includes several resiliency features.
+The platform includes multiple resiliency mechanisms designed to reduce recovery requirements.
 
-## Multi-AZ Deployment
+---
+
+## Multi-Availability Zone Design
 
 Resources are distributed across:
 
@@ -83,9 +141,23 @@ us-east-1b
 
 Benefits:
 
-* Availability Zone fault tolerance
+* Fault isolation
 * Reduced single points of failure
 * Improved service availability
+* Availability Zone resiliency
+
+---
+
+## Application Load Balancer
+
+The Application Load Balancer provides:
+
+* Health monitoring
+* Traffic distribution
+* Automatic target removal
+* Fault isolation
+
+Unhealthy application instances are automatically removed from service.
 
 ---
 
@@ -95,270 +167,263 @@ The Auto Scaling Group provides:
 
 * Automatic instance replacement
 * Capacity maintenance
-* Health-based recovery
+* Self-healing application infrastructure
 
 Example:
 
-If an EC2 instance becomes unhealthy:
-
 ```text
 Instance Failure
-        |
-        v
-Auto Scaling Detection
-        |
-        v
-Instance Replacement
+      │
+      ▼
+Health Check Failure
+      │
+      ▼
+Auto Scaling Replacement
 ```
 
 ---
 
-## Application Load Balancer
+## Aurora MySQL
 
-The Application Load Balancer provides:
+Aurora provides:
 
-* Traffic distribution
-* Health monitoring
-* Fault isolation
+* Automated backups
+* Managed storage
+* Multi-AZ architecture
+* Database failover capabilities
 
-Unhealthy instances are automatically removed from service.
+These capabilities reduce recovery complexity for database failures.
 
 ---
 
 # Backup Strategy
 
-## Aurora Backups
+## Automated Aurora Backups
 
-Aurora provides automated backups.
+Aurora provides automated backup capabilities.
 
-Backup capabilities:
+Features:
 
-* Automated snapshots
 * Point-in-time recovery
-* Managed backup retention
+* Continuous backup management
+* Automated snapshot retention
 
-Recommended backup retention:
+Recommended retention:
 
 ```text
-7–30 days
+7–30 Days
 ```
 
-depending on business requirements.
+Depending on business requirements.
 
 ---
 
 ## Manual Snapshots
 
-Before significant infrastructure changes:
+Manual snapshots should be created before:
 
-Create manual database snapshots.
+* Major upgrades
+* Database modifications
+* Schema migrations
+* Significant application releases
 
 Benefits:
 
-* Additional recovery point
-* Protection before upgrades
+* Additional recovery points
 * Rollback capability
+* Change protection
+
+---
+
+# Recovery Matrix
+
+| Failure Type        | Recovery Method                    | Expected Recovery        |
+| ------------------- | ---------------------------------- | ------------------------ |
+| EC2 Failure         | Auto Scaling replacement           | 5–10 minutes             |
+| ALB Failure         | AWS managed recovery               | Typically automatic      |
+| Application Failure | Application restart or replacement | 10–30 minutes            |
+| Aurora Failure      | Failover or restore                | 15–60 minutes            |
+| Resource Deletion   | Redeployment                       | 15–60 minutes            |
+| AZ Failure          | Multi-AZ architecture              | Service degradation only |
 
 ---
 
 # Recovery Scenarios
 
-## Scenario 1: EC2 Instance Failure
+## Scenario 1 – EC2 Instance Failure
 
 ### Symptoms
 
-* Unhealthy target
-* Application degradation
-* Instance status check failure
+* Failed status checks
+* Unhealthy targets
+* Reduced application capacity
 
 ### Recovery
 
-Auto Scaling automatically launches replacement capacity.
+Auto Scaling launches replacement instances automatically.
 
 Expected recovery:
 
 ```text
-5–10 minutes
+5–10 Minutes
 ```
 
 ---
 
-## Scenario 2: Application Failure
+## Scenario 2 – Application Failure
 
 ### Symptoms
 
-* Target group health checks fail
-* Increased HTTP 5XX errors
+* HTTP 5XX responses
+* Failed health checks
+* Application crashes
 
 ### Recovery
 
-1. Investigate application logs
-2. Restart application service
-3. Replace affected instances if necessary
+1. Review application logs
+2. Restart services
+3. Replace instances if necessary
+4. Validate target health
 
-Recovery may be automated through Auto Scaling.
+Expected recovery:
+
+```text
+10–30 Minutes
+```
 
 ---
 
-## Scenario 3: Aurora Database Failure
+## Scenario 3 – Aurora Database Failure
 
 ### Symptoms
 
-* Database connectivity failures
-* Application errors
+* Database connection failures
+* Application database errors
+* Aurora event notifications
 
 ### Recovery
 
-1. Verify Aurora cluster status
+1. Verify cluster health
 2. Review Aurora events
-3. Perform failover if required
-4. Restore from backup if necessary
+3. Initiate failover if necessary
+4. Restore from backup if required
 
-Expected recovery depends on failure type.
+Expected recovery:
+
+```text
+15–60 Minutes
+```
 
 ---
 
-## Scenario 4: Accidental Resource Deletion
+## Scenario 4 – Accidental Resource Deletion
 
 ### Symptoms
-
-Infrastructure component missing.
 
 Examples:
 
-* Security group deletion
-* Route table deletion
-* IAM resource deletion
+* Deleted security group
+* Deleted route table
+* Deleted IAM role
+* Deleted target group
 
 ### Recovery
 
-Redeploy infrastructure:
+Redeploy infrastructure.
+
+Command:
 
 ```bash
-./scripts/deploy/deploy.sh
+./deploy.sh
 ```
 
 Infrastructure automation serves as the primary recovery mechanism.
 
 ---
 
-## Scenario 5: Availability Zone Failure
+## Scenario 5 – Availability Zone Failure
 
 ### Symptoms
 
-AWS Availability Zone disruption.
+* Resource degradation within one AZ
+* Instance loss
+* Reduced capacity
 
 ### Recovery
 
-Remaining Availability Zone resources continue serving traffic.
+1. Verify surviving resources
+2. Review Auto Scaling health
+3. Monitor ALB target health
+4. Validate Aurora status
 
-Recovery actions:
+Expected recovery:
 
-* Validate healthy resources
-* Review Auto Scaling status
-* Monitor application performance
+```text
+Automatic or Minimal Intervention
+```
 
 ---
 
-# Infrastructure Recovery
+# Infrastructure Recovery Strategy
 
-Infrastructure is fully automated.
+Infrastructure is treated as code.
 
 Primary recovery mechanism:
 
 ```bash
-./scripts/deploy/deploy.sh
+./deploy.sh
 ```
 
-Infrastructure automation enables:
+Benefits:
 
 * Consistent recovery
 * Repeatable deployments
 * Reduced manual configuration
+* Reduced recovery errors
 
-This approach aligns with Infrastructure as Code principles.
+This approach aligns with modern Infrastructure as Code principles.
 
 ---
 
 # Recovery Validation
 
-Following recovery:
-
-Validate:
-
-## Load Balancer
+Following recovery activities, execute:
 
 ```bash
-aws elbv2 describe-load-balancers
+./verify.sh
 ```
+
+Validation should confirm:
+
+* VPC availability
+* Route table configuration
+* ALB health
+* Auto Scaling health
+* EC2 instance health
+* Aurora availability
+* Security group configuration
 
 ---
 
-## Auto Scaling
+# Detection and Monitoring
 
-```bash
-aws autoscaling describe-auto-scaling-groups
-```
+Disaster recovery relies on rapid detection.
 
----
+Recommended monitoring services:
 
-## Target Health
-
-```bash
-aws elbv2 describe-target-health \
-  --target-group-arn <target-group-arn>
-```
-
----
-
-## Database
-
-```bash
-aws rds describe-db-clusters
-```
-
----
-
-## Environment Validation
-
-Execute:
-
-```bash
-./scripts/validation/verify-environment.sh
-```
-
----
-
-# Monitoring Integration
-
-Disaster recovery relies on monitoring for early detection.
-
-Supporting systems:
-
-* CloudWatch Metrics
+* Amazon CloudWatch
 * CloudWatch Alarms
-* CloudTrail
-* Operational Runbooks
+* AWS CloudTrail
+* AWS Config
+* Aurora Events
 
-Monitoring guidance is documented in:
+Monitoring should identify:
 
-```text
-monitoring-strategy.md
-```
-
----
-
-# Future Disaster Recovery Improvements
-
-Potential enhancements:
-
-* Multi-region deployment
-* Cross-region database replication
-* Route 53 failover routing
-* Automated backup validation
-* Recovery automation workflows
-* Infrastructure as Code migration
-* Recovery testing exercises
+* Service outages
+* Failed health checks
+* Resource deletion
+* Configuration drift
+* Database failures
 
 ---
 
@@ -369,17 +434,59 @@ Recovery procedures should be tested regularly.
 Recommended exercises:
 
 * EC2 failure simulation
-* Target group failure simulation
-* Database recovery testing
-* Auto Scaling recovery validation
+* Target group health failure simulation
+* Auto Scaling replacement testing
+* Database restore testing
 * Backup restoration testing
+* Resource redeployment exercises
 
-Testing ensures recovery procedures remain effective.
+Testing validates recovery assumptions and improves operational readiness.
+
+---
+
+# Future Disaster Recovery Enhancements
+
+Potential future improvements include:
+
+* Multi-region deployment
+* Cross-region Aurora replication
+* Route 53 failover routing
+* Recovery automation workflows
+* Backup validation automation
+* Infrastructure as Code migration
+* Scheduled DR exercises
+* Recovery dashboards
+
+---
+
+# Related Documentation
+
+Additional operational references:
+
+```text
+docs/operations/incident-scenarios.md
+docs/operations/operational-runbook.md
+docs/operations/monitoring-strategy.md
+```
+
+Relevant architecture decisions:
+
+```text
+docs/architecture/architecture-decisions.md
+```
 
 ---
 
 # Summary
 
-The disaster recovery strategy combines AWS managed services, multi-AZ deployment, automated backups, and infrastructure automation to improve resilience.
+The disaster recovery strategy combines AWS managed services, multi-Availability Zone architecture, automated backups, infrastructure automation, and operational procedures to improve resiliency.
 
-The goal is to minimize downtime, reduce operational complexity, and provide repeatable recovery procedures following service disruptions.
+The platform emphasizes:
+
+* Rapid recovery
+* Repeatable procedures
+* Infrastructure automation
+* Reduced operational complexity
+* Continuous recovery validation
+
+The result is a disaster recovery approach that aligns with modern cloud operations practices while remaining practical for a development and portfolio environment.

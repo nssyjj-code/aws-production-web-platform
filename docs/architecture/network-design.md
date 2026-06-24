@@ -4,85 +4,113 @@
 
 This document describes the networking architecture used by the AWS Production Web Platform.
 
-The environment is deployed within a dedicated Amazon VPC and follows a multi-tier network design that separates public-facing resources, application services, and database services.
+The environment is deployed within a dedicated Amazon Virtual Private Cloud (VPC) and follows a multi-tier network design that separates public-facing resources, application services, and database services.
 
-Network design goals:
+The design emphasizes:
 
-* Network isolation
+* Security
 * High availability
 * Controlled internet exposure
-* Secure east-west communication
-* Production-style subnet segmentation
+* Network segmentation
+* Operational simplicity
+* Production-style AWS networking patterns
 
 ---
 
-# Network Architecture
+## Network Design Principles
+
+The network architecture was designed around the following principles.
+
+### Least Privilege Networking
+
+Only required communication paths are permitted between tiers.
+
+### Defense in Depth
+
+Security controls exist at multiple layers including subnet placement, route tables, security groups, and IAM controls.
+
+### High Availability
+
+Network resources are distributed across multiple Availability Zones.
+
+### Separation of Duties
+
+Public, application, and database workloads operate within dedicated network segments.
+
+### Controlled Internet Access
+
+Internet connectivity is explicitly managed through Internet Gateways and NAT Gateways.
+
+---
+
+## Network Architecture
 
 The platform is deployed across two Availability Zones within a single AWS Region.
 
-Architecture:
-
-```text
+```text id="u9s9y3"
 Internet
-    |
-    v
+    │
+    ▼
 Internet Gateway
-    |
-    v
+    │
+    ▼
 Public Subnets
-    |
-    v
+    │
+    ▼
 Application Load Balancer
-    |
-    v
+    │
+    ▼
 Private Application Subnets
-    |
-    v
+    │
+    ▼
 Private Database Subnets
 ```
 
 ---
 
-# VPC Design
+## VPC Design
 
-The environment uses a dedicated Virtual Private Cloud (VPC).
+### Region
 
-| Item               | Value                  |
-| ------------------ | ---------------------- |
-| Region             | us-east-1              |
-| VPC CIDR           | 10.0.0.0/16            |
-| Availability Zones | us-east-1a, us-east-1b |
+```text id="57dd6k"
+us-east-1
+```
 
----
+### VPC CIDR
 
-## CIDR Strategy
-
-VPC CIDR:
-
-```text
+```text id="xplpmq"
 10.0.0.0/16
 ```
 
-The /16 address space was selected because it:
+### Availability Zones
 
-* Provides sufficient address capacity
-* Supports future subnet growth
-* Simplifies subnet allocation
-* Follows common enterprise networking practices
-
-Available address capacity:
-
-```text
-65,536 IP addresses
+```text id="qiw18z"
+us-east-1a
+us-east-1b
 ```
+
+### VPC Capacity
+
+The selected CIDR range provides:
+
+```text id="kh5zva"
+65,536 IPv4 addresses
+```
+
+Benefits:
+
+* Supports future growth
+* Simplifies subnet allocation
+* Common enterprise design pattern
+* Reduces risk of CIDR exhaustion
 
 ---
 
-# Availability Zone Design
+## Availability Zone Design
 
 Resources are distributed across:
 
-```text
+```text id="oqxeh8"
 us-east-1a
 us-east-1b
 ```
@@ -90,305 +118,377 @@ us-east-1b
 Benefits:
 
 * Fault isolation
-* Improved availability
+* Increased resiliency
 * Reduced single points of failure
-* Support for Multi-AZ application deployment
+* Support for highly available services
 
-If a single Availability Zone becomes unavailable, application resources can continue operating within the remaining Availability Zone.
+If a single Availability Zone becomes unavailable, infrastructure can continue operating in the remaining zone.
 
 ---
 
-# Subnet Design
+## Subnet Design
 
-The environment uses six subnets.
+The platform uses six dedicated subnets.
 
-## Public Subnets
+### Public Subnets
 
 | Subnet            | CIDR        | Availability Zone | Purpose             |
 | ----------------- | ----------- | ----------------- | ------------------- |
-| public-subnet-az1 | 10.0.1.0/24 | us-east-1a        | ALB and NAT Gateway |
-| public-subnet-az2 | 10.0.2.0/24 | us-east-1b        | ALB and NAT Gateway |
+| Public Subnet AZ1 | 10.0.1.0/24 | us-east-1a        | ALB and NAT Gateway |
+| Public Subnet AZ2 | 10.0.2.0/24 | us-east-1b        | ALB and NAT Gateway |
 
-Purpose:
+Responsibilities:
 
 * Internet-facing resources
-* Inbound traffic entry point
-* Outbound NAT services
+* Load balancer placement
+* NAT Gateway placement
 
 ---
 
-## Private Application Subnets
+### Private Application Subnets
 
-| Subnet                 | CIDR         | Availability Zone | Purpose             |
-| ---------------------- | ------------ | ----------------- | ------------------- |
-| private-app-subnet-az1 | 10.0.11.0/24 | us-east-1a        | Application compute |
-| private-app-subnet-az2 | 10.0.12.0/24 | us-east-1b        | Application compute |
+| Subnet          | CIDR         | Availability Zone | Purpose                 |
+| --------------- | ------------ | ----------------- | ----------------------- |
+| Private App AZ1 | 10.0.11.0/24 | us-east-1a        | EC2 Application Servers |
+| Private App AZ2 | 10.0.12.0/24 | us-east-1b        | EC2 Application Servers |
 
-Purpose:
+Responsibilities:
 
-* EC2 application instances
+* Application processing
 * Auto Scaling Group placement
-* No direct internet exposure
+* Internal service communication
+
+Characteristics:
+
+* No public IP addresses
+* No direct inbound internet access
 
 ---
 
-## Private Database Subnets
+### Private Database Subnets
 
-| Subnet                | CIDR         | Availability Zone | Purpose              |
-| --------------------- | ------------ | ----------------- | -------------------- |
-| private-db-subnet-az1 | 10.0.21.0/24 | us-east-1a        | Aurora database tier |
-| private-db-subnet-az2 | 10.0.22.0/24 | us-east-1b        | Aurora database tier |
+| Subnet         | CIDR         | Availability Zone | Purpose      |
+| -------------- | ------------ | ----------------- | ------------ |
+| Private DB AZ1 | 10.0.21.0/24 | us-east-1a        | Aurora MySQL |
+| Private DB AZ2 | 10.0.22.0/24 | us-east-1b        | Aurora MySQL |
 
-Purpose:
+Responsibilities:
 
-* Database isolation
-* Restricted access
-* No internet connectivity
+* Database services
+* Data persistence
+* Private network communication
+
+Characteristics:
+
+* No internet access
+* Application-tier access only
 
 ---
 
-# Routing Design
+## Route Table Design
 
-## Public Route Table
+### Route Table Summary
 
-Public subnets use:
+| Route Table                  | Associated Resources   |
+| ---------------------------- | ---------------------- |
+| Public Route Table           | Public Subnets         |
+| Private App Route Table AZ1  | Private App Subnet AZ1 |
+| Private App Route Table AZ2  | Private App Subnet AZ2 |
+| Private Database Route Table | Database Subnets       |
 
-```text
+---
+
+### Public Route Table
+
+Default route:
+
+```text id="nhx6n8"
 0.0.0.0/0 → Internet Gateway
 ```
 
 Purpose:
 
-* Internet access
-* Public application entry point
+* Public internet access
+* ALB connectivity
 * NAT Gateway connectivity
 
 ---
 
-## Private Application Route Tables
+### Private Application Route Tables
 
-Private application subnets use:
+Default route:
 
-```text
+```text id="uobkt4"
 0.0.0.0/0 → NAT Gateway
 ```
 
 Purpose:
 
-* Software updates
-* Package downloads
+* Package updates
 * External API communication
+* AWS service access
 
 Inbound internet traffic is not permitted.
 
 ---
 
-## Database Route Tables
+### Database Route Table
 
-Database subnets do not require direct internet connectivity.
+Database resources remain isolated.
 
-Database resources communicate only with application resources inside the VPC.
+Characteristics:
+
+* No direct internet access
+* Application-tier communication only
+* Restricted routing model
 
 ---
 
-# Internet Connectivity Design
+## Internet Connectivity Design
 
-## Internet Gateway
+### Internet Gateway
 
-The VPC includes an Internet Gateway.
+The VPC contains a single Internet Gateway.
 
-Purpose:
+Responsibilities:
 
-* Public internet access
-* Load balancer connectivity
-* NAT Gateway connectivity
+* Internet access for public resources
+* ALB internet connectivity
+* NAT Gateway internet connectivity
 
 Traffic flow:
 
-```text
+```text id="l5wud4"
 Internet
-    |
-    v
+    │
+    ▼
 Internet Gateway
-    |
-    v
+    │
+    ▼
 Public Subnets
 ```
 
 ---
 
-## NAT Gateway Design
+### NAT Gateway Design
 
 Each Availability Zone contains a dedicated NAT Gateway.
 
 Architecture:
 
-```text
-Private App Subnet AZ-A
-          |
-          v
-     NAT Gateway A
+```text id="z2ejlx"
+Private App Subnet AZ1
+          │
+          ▼
+     NAT Gateway AZ1
 
-Private App Subnet AZ-B
-          |
-          v
-     NAT Gateway B
+Private App Subnet AZ2
+          │
+          ▼
+     NAT Gateway AZ2
 ```
 
 Benefits:
 
 * Outbound internet access
-* Private instance protection
-* Improved availability
+* No inbound exposure
+* Improved fault isolation
 
 Tradeoff:
 
-* Increased monthly cost compared to a single NAT Gateway design
+* Higher monthly operating cost
 
 ---
 
-# Traffic Flow
+## Security Boundaries
 
-## Inbound Traffic
+The network follows a layered security model.
 
-User request:
-
-```text
+```text id="e4gk8i"
 Internet
-    |
-    v
-Application Load Balancer
-    |
-    v
-EC2 Application Instance
-```
-
-The Application Load Balancer is the only publicly reachable application endpoint.
-
----
-
-## Application to Database Traffic
-
-Application request:
-
-```text
-Application Instance
-          |
-          v
-Aurora MySQL
-```
-
-Database access remains private within the VPC.
-
----
-
-## Outbound Traffic
-
-Application outbound traffic:
-
-```text
-EC2 Instance
-     |
-     v
-NAT Gateway
-     |
-     v
-Internet
-```
-
-This allows software updates and external service communication while preventing inbound internet access.
-
----
-
-# Network Security Intent
-
-The network architecture follows a defense-in-depth model.
-
-Security goals:
-
-* Minimize public exposure
-* Isolate application and database tiers
-* Restrict communication paths
-* Support least-privilege networking
-
-Traffic restrictions:
-
-```text
-Internet
-     |
-     v
+    │
+    ▼
 ALB Security Group
-     |
-     v
+    │
+    ▼
 Application Security Group
-     |
-     v
+    │
+    ▼
 Database Security Group
 ```
 
-Only required communication paths are allowed.
+Allowed communication:
+
+| Source           | Destination      | Port    |
+| ---------------- | ---------------- | ------- |
+| Internet         | ALB              | 80, 443 |
+| ALB              | Application Tier | 80      |
+| Application Tier | Aurora           | 3306    |
+
+All other traffic is denied by default.
 
 ---
 
-# Design Decisions
+## Traffic Flow
 
-## Why Private Application Subnets?
+### Inbound User Traffic
 
-Application servers do not require direct internet exposure.
+```text id="cnybvh"
+Internet
+    │
+    ▼
+Application Load Balancer
+    │
+    ▼
+Application Instance
+```
+
+---
+
+### Application to Database Traffic
+
+```text id="p4h8ww"
+Application Instance
+        │
+        ▼
+Aurora MySQL
+```
+
+---
+
+### Outbound Application Traffic
+
+```text id="9g7z9w"
+EC2 Instance
+     │
+     ▼
+NAT Gateway
+     │
+     ▼
+Internet
+```
+
+---
+
+## Operational Considerations
+
+### VPC Flow Logs
+
+VPC Flow Logs are recommended for:
+
+* Traffic visibility
+* Troubleshooting
+* Security investigations
+* Compliance reporting
+
+Future implementation may forward logs to CloudWatch Logs or Amazon S3.
+
+---
+
+### VPC Endpoints
+
+Future enhancements may include:
+
+* S3 Gateway Endpoints
+* Systems Manager Interface Endpoints
+* CloudWatch Interface Endpoints
 
 Benefits:
 
-* Reduced attack surface
-* Improved security posture
-* Better alignment with production architectures
+* Reduced NAT Gateway usage
+* Improved security
+* Lower data transfer costs
 
 ---
 
-## Why Private Database Subnets?
+## Failure Scenarios
 
-Databases should never be directly accessible from the internet.
+### Availability Zone Failure
 
-Benefits:
+Impact:
 
-* Reduced exposure risk
-* Controlled access model
-* Improved compliance with security best practices
+* Loss of one subnet set
+* Remaining AZ continues serving traffic
 
----
+Mitigation:
 
-## Why Multi-AZ Networking?
-
-Multi-AZ deployment improves resilience.
-
-Benefits:
-
-* Availability during AZ failures
-* Better fault isolation
-* Support for highly available services
+* Multi-AZ deployment
+* Auto Scaling Group distribution
+* Aurora resilience features
 
 ---
 
-# Future Enhancements
+### NAT Gateway Failure
 
-Potential networking improvements:
+Impact:
 
-* VPC Flow Logs
-* Transit Gateway integration
-* AWS Network Firewall
-* IPv6 support
-* PrivateLink integration
-* VPC endpoints for AWS services
+* Loss of outbound connectivity for affected subnet
+
+Mitigation:
+
+* Dedicated NAT Gateway per Availability Zone
 
 ---
 
-# Summary
+### Internet Gateway Failure
 
-The network architecture separates public, application, and database resources into dedicated subnet tiers across multiple Availability Zones.
+Impact:
+
+* Public connectivity loss
+
+Mitigation:
+
+* AWS managed service architecture
+
+---
+
+## Cost Considerations
+
+The largest networking cost drivers are:
+
+* NAT Gateways
+* Data transfer
+* Load Balancer usage
+
+The design intentionally prioritizes availability and security over minimum cost.
+
+Potential future optimizations:
+
+* VPC Endpoints
+* Traffic reduction strategies
+* Cost-aware routing patterns
+
+---
+
+## Related Architecture Decisions
+
+Relevant Architecture Decision Records:
+
+```text id="2v2shl"
+ADR-002 Multi-AZ Networking
+ADR-003 Private Application Subnets
+ADR-007 NAT Gateway Design
+ADR-008 Security Group Referencing
+```
+
+Reference:
+
+```text id="ol7j8f"
+docs/architecture/architecture-decisions.md
+```
+
+---
+
+## Summary
+
+The AWS Production Web Platform network architecture separates public, application, and database resources into dedicated subnet tiers distributed across multiple Availability Zones.
 
 The design prioritizes:
 
 * Security
 * Availability
-* Controlled internet access
 * Network segmentation
-* Production-style AWS networking practices
+* Controlled internet access
+* Operational maintainability
+
+The resulting architecture closely mirrors networking patterns commonly used in production AWS environments while remaining practical for a portfolio and learning environment.

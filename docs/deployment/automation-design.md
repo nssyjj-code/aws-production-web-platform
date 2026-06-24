@@ -2,65 +2,175 @@
 
 ## Overview
 
-This document describes the design approach behind the AWS CLI automation used to deploy, validate, and destroy the AWS Production Web Platform.
+This document describes the automation architecture used to deploy, validate, and destroy the AWS Production Web Platform.
 
-The automation was designed to provide repeatable infrastructure lifecycle management while demonstrating how AWS resources depend on each other during provisioning and teardown.
+The platform is intentionally automated using AWS CLI and Bash to demonstrate infrastructure lifecycle management, dependency handling, resource discovery, and operational automation principles commonly used in cloud engineering environments.
 
-Automation goals:
+Automation goals include:
 
 * Repeatable deployments
-* Consistent configuration management
-* Dependency-aware resource creation
-* Safe environment cleanup
-* Operational troubleshooting visibility
+* Infrastructure consistency
+* Dependency-aware provisioning
+* Safe environment destruction
+* Operational visibility
+* Idempotent execution
+* Troubleshooting support
 
 ---
 
-# Automation Structure
+## Automation Philosophy
 
-Project automation is organized by lifecycle stage.
+The project treats infrastructure as code.
+
+All infrastructure resources are:
+
+* Version controlled
+* Reproducible
+* Script-driven
+* Documented
+* Validated after deployment
+
+The objective is not only to deploy AWS resources but also to demonstrate understanding of infrastructure dependencies and lifecycle management.
+
+---
+
+## Repository Automation Structure
+
+Automation is organized by lifecycle stage.
 
 ```text
-scripts/
-
-├── deploy/
-│   └── deploy.sh
-
-├── validation/
-│   └── verify-environment.sh
-
-└── cleanup/
-    └── destroy-environment.sh
+.
+├── deploy.sh
+├── verify.sh
+├── destroy.sh
+│
+├── config/
+│   └── environment.conf
+│
+└── scripts/
+    ├── setup/
+    ├── deploy/
+    ├── validation/
+    ├── cleanup/
+    └── lib/
 ```
-
-Each script focuses on a specific operational responsibility:
-
-| Script                 | Purpose                           |
-| ---------------------- | --------------------------------- |
-| deploy.sh              | Creates AWS infrastructure        |
-| verify-environment.sh  | Validates deployed resources      |
-| destroy-environment.sh | Removes AWS infrastructure safely |
 
 ---
 
-# Configuration Management
+## Root-Level Automation Wrappers
 
-Deployment settings are separated from automation logic.
+Three primary entry points exist at the repository root.
 
-Configuration file:
+### deploy.sh
+
+Deploys the entire platform.
+
+Responsibilities:
+
+* Environment validation
+* AWS credential verification
+* Dependency-aware deployment execution
+
+Example:
+
+```bash
+./deploy.sh
+```
+
+---
+
+### verify.sh
+
+Validates deployed resources.
+
+Responsibilities:
+
+* Infrastructure verification
+* Service health validation
+* Deployment confirmation
+
+Example:
+
+```bash
+./verify.sh
+```
+
+---
+
+### destroy.sh
+
+Removes deployed resources.
+
+Responsibilities:
+
+* Safe dependency removal
+* Resource cleanup
+* Cost control
+
+Example:
+
+```bash
+./destroy.sh
+```
+
+---
+
+## Shared Library Design
+
+Reusable logic is centralized in:
+
+```text
+scripts/lib/
+```
+
+Examples:
+
+| Library           | Purpose                            |
+| ----------------- | ---------------------------------- |
+| aws.sh            | Resource discovery helpers         |
+| networking.sh     | VPC and subnet operations          |
+| security.sh       | Security group management          |
+| compute.sh        | EC2 and launch template operations |
+| database.sh       | Aurora and RDS operations          |
+| autoscaling.sh    | Auto Scaling operations            |
+| load-balancing.sh | ALB and Target Group operations    |
+| iam.sh            | IAM role and profile management    |
+| validation.sh     | Environment validation             |
+| logging.sh        | Consistent logging                 |
+
+Benefits:
+
+* Reduced code duplication
+* Easier maintenance
+* Consistent behavior
+* Improved readability
+
+---
+
+## Configuration Management
+
+Configuration values are separated from deployment logic.
+
+Location:
 
 ```text
 config/environment.conf
 ```
 
-The deployment scripts load configuration values at runtime.
+Examples:
+
+* Region
+* VPC CIDR
+* Resource names
+* Auto Scaling configuration
+* Aurora configuration
 
 Benefits:
 
-* Avoids hardcoded resource values
-* Allows environment customization
-* Improves maintainability
-* Separates configuration from execution logic
+* Centralized configuration
+* Environment customization
+* Improved maintainability
+* Reduced hardcoding
 
 Example:
 
@@ -70,246 +180,278 @@ source config/environment.conf
 
 ---
 
-# Deployment Automation Design
+## Deployment Architecture
 
-The deployment script follows a dependency-based execution model.
-
-AWS resources are created only after their dependencies exist.
-
-Deployment order:
+Infrastructure is deployed in dependency order.
 
 ```text
 VPC
- |
- v
+ │
+ ▼
 Subnets
- |
- v
+ │
+ ▼
 Internet Gateway
- |
- v
+ │
+ ▼
 Route Tables
- |
- v
+ │
+ ▼
 NAT Gateways
- |
- v
+ │
+ ▼
 Security Groups
- |
- v
+ │
+ ▼
 IAM
- |
- v
+ │
+ ▼
 Launch Template
- |
- v
+ │
+ ▼
 Target Group
- |
- v
+ │
+ ▼
 Application Load Balancer
- |
- v
+ │
+ ▼
 Auto Scaling Group
- |
- v
+ │
+ ▼
 Aurora Database
 ```
 
+This ordering prevents AWS dependency failures.
+
 ---
 
-# Why Dependency Ordering Matters
+## Why Dependency Ordering Matters
 
-AWS services depend on other resources existing before creation.
+AWS resources frequently require previously created resources.
 
 Examples:
 
-A subnet cannot exist without:
+### Subnets
+
+Require:
 
 ```text
 VPC
 ```
 
-An Auto Scaling Group requires:
+### Auto Scaling Groups
+
+Require:
 
 ```text
 Launch Template
-        +
 Subnets
-        +
 Target Group
 ```
 
-Aurora requires:
+### Aurora Clusters
+
+Require:
 
 ```text
 DB Subnet Group
-        +
 Security Group
 ```
 
-The automation handles this ordering to prevent deployment failures.
+Failure to deploy in dependency order results in AWS API errors.
 
 ---
 
-# Script Design Pattern
+## Idempotency Strategy
 
-Scripts use a modular function-based structure.
+Deployment automation is designed to be safely re-executed.
 
-Example:
+Each deployment script:
 
-```bash
-main() {
-    create_network
-    create_security
-    create_compute
-    create_database
-    validate_deployment
-}
+1. Searches for existing resources
+2. Creates resources only when absent
+3. Reuses existing resources when found
+4. Returns resource identifiers consistently
+
+Example workflow:
+
+```text
+Check Resource
+      │
+      ▼
+Exists?
+ │         │
+Yes       No
+ │         │
+Reuse    Create
+ │         │
+ └────► Continue
 ```
 
 Benefits:
 
+* Safe redeployment
+* Reduced deployment failures
 * Easier troubleshooting
-* Better readability
-* Individual component testing
-* Cleaner maintenance
+* Improved operational resilience
 
 ---
 
-# Error Handling Strategy
+## Resource Discovery Strategy
 
-Scripts use strict Bash execution settings.
+Automation relies heavily on dynamic resource discovery.
 
-```bash
-set -euo pipefail
-```
-
-Purpose:
-
-## -e
-
-Exit immediately when a command fails.
-
-Prevents continuing after failed infrastructure creation.
-
-## -u
-
-Detect undefined variables.
-
-Prevents accidental deployment using missing configuration.
-
-## pipefail
-
-Detect failures inside command pipelines.
-
-Improves reliability of automation logic.
-
----
-
-# AWS CLI Resource Discovery
-
-Automation avoids relying only on manually provided IDs.
-
-Where possible, resources are discovered dynamically.
+Resources are located using tags and AWS APIs rather than hardcoded IDs.
 
 Example:
 
 ```bash
 aws ec2 describe-vpcs \
-  --filters "Name=tag:Name,Values=<name>"
+  --filters "Name=tag:Name,Values=<resource-name>"
 ```
 
 Benefits:
 
-* More flexible automation
-* Easier troubleshooting
-* Reduced manual input
+* Portability
+* Reduced manual effort
+* Easier recovery from partial deployments
 
 ---
 
-# Validation Automation
+## Error Handling Strategy
 
-After deployment, validation checks confirm resources were created successfully.
+All scripts use strict Bash execution settings.
 
-Validation includes:
+```bash
+set -euo pipefail
+```
 
-Networking:
+### -e
+
+Exit immediately when commands fail.
+
+### -u
+
+Fail when undefined variables are referenced.
+
+### pipefail
+
+Detect failures inside command pipelines.
+
+Benefits:
+
+* Earlier error detection
+* More reliable automation
+* Reduced silent failures
+
+---
+
+## Logging Strategy
+
+All deployment operations use centralized logging helpers.
+
+Log levels include:
+
+```text
+INFO
+SUCCESS
+ERROR
+```
+
+Example:
+
+```text
+[INFO] Creating VPC...
+[SUCCESS] VPC created.
+[ERROR] Resource creation failed.
+```
+
+Benefits:
+
+* Consistent output
+* Easier troubleshooting
+* Better deployment visibility
+
+---
+
+## Validation Architecture
+
+Validation occurs before and after deployment.
+
+### Pre-Deployment Validation
+
+Checks include:
+
+* AWS CLI installed
+* AWS credentials valid
+* Configuration loaded
+
+### Post-Deployment Validation
+
+Checks include:
 
 * VPC exists
 * Subnets exist
-* Routes configured
-
-Compute:
-
-* Auto Scaling Group exists
-* Instances running
-* Target health checks passing
-
-Database:
-
-* Aurora cluster available
-
-Security:
-
-* Expected security groups exist
+* Route tables configured
+* ALB operational
+* Auto Scaling Group operational
+* Aurora available
 
 ---
 
-# Destroy Automation Design
+## Destruction Architecture
 
-The destroy process follows reverse dependency ordering.
-
-Resources must be deleted safely because AWS prevents removing resources with active dependencies.
-
-Cleanup order:
+Cleanup follows reverse dependency order.
 
 ```text
 Auto Scaling Group
- |
- v
-ALB Listeners
- |
- v
-Application Load Balancer
- |
- v
+ │
+ ▼
+Listeners
+ │
+ ▼
+Load Balancer
+ │
+ ▼
 Target Group
- |
- v
+ │
+ ▼
 Aurora Resources
- |
- v
+ │
+ ▼
 Launch Templates
- |
- v
+ │
+ ▼
 IAM Resources
- |
- v
+ │
+ ▼
 NAT Gateways
- |
- v
+ │
+ ▼
 Route Tables
- |
- v
+ │
+ ▼
 Security Groups
- |
- v
+ │
+ ▼
 Subnets
- |
- v
+ │
+ ▼
 Internet Gateway
- |
- v
+ │
+ ▼
 VPC
 ```
 
+This prevents AWS dependency violations.
+
 ---
 
-# Dependency Issue Example
+## Example Dependency Failure
 
-During development, target group deletion failed because it was still attached to an Application Load Balancer listener.
+During development, Target Group deletion failed because an Application Load Balancer listener still referenced the Target Group.
 
-Error:
+AWS error:
 
 ```text
 ResourceInUse:
@@ -318,66 +460,54 @@ Target group is currently in use by a listener or rule
 
 Resolution:
 
-Destroy automation was updated to remove dependencies first.
-
-Correct order:
-
 ```text
 Delete Listener
-       |
-       v
+      │
+      ▼
 Delete Target Group
+```
+
+This behavior was incorporated into the destruction automation.
+
+---
+
+## Production Evolution Path
+
+This project intentionally uses AWS CLI automation to reinforce AWS service-level understanding.
+
+A production evolution could include:
+
+* Terraform
+* CloudFormation
+* GitHub Actions
+* CI/CD pipelines
+* Automated testing
+* Drift detection
+* Change approval workflows
+* Multi-environment deployments
+
+---
+
+## Related Documentation
+
+Additional automation references:
+
+```text
+docs/deployment/deployment-guide.md
+docs/operations/testing-strategy.md
+docs/operations/operational-runbook.md
 ```
 
 ---
 
-# Idempotency Considerations
+## Summary
 
-Automation is designed to safely handle repeated execution.
-
-Examples:
-
-* Check if resources exist before deletion
-* Continue cleanup when resources are already removed
-* Validate AWS responses before proceeding
-
-This reduces failures during retries.
-
----
-
-# Current Implementation Choice
-
-This project intentionally uses AWS CLI automation.
-
-Purpose:
-
-* Understand AWS service relationships
-* Practice infrastructure automation fundamentals
-* Learn dependency management
-
----
-
-# Future Production Improvements
-
-A production evolution of this automation could include:
-
-* Terraform migration
-* CloudFormation implementation
-* CI/CD pipeline execution
-* Automated testing
-* Deployment approvals
-* State management
-* Drift detection
-
----
-
-# Summary
-
-The automation design demonstrates complete infrastructure lifecycle management:
+The automation architecture demonstrates complete infrastructure lifecycle management through:
 
 * Provisioning
 * Validation
-* Operation
+* Monitoring
+* Troubleshooting
 * Cleanup
 
-The goal is not only creating AWS resources, but understanding the automation principles used by production infrastructure platforms.
+The design emphasizes repeatability, visibility, dependency awareness, and operational maintainability while demonstrating cloud engineering automation principles commonly found in production environments.

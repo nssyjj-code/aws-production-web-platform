@@ -1,22 +1,26 @@
-# Architecture Decisions
+# Architecture Decision Records (ADR)
 
 ## Overview
 
 This document records the major architecture decisions made for the AWS Production Web Platform.
 
-The goal is to document not only what was built, but why specific AWS services, network patterns, and operational designs were selected.
+The purpose of these Architecture Decision Records (ADRs) is to document not only what was built, but why specific AWS services, networking patterns, security controls, and operational practices were selected.
 
-Each decision includes:
+Each ADR contains:
 
+* Status
 * Context
 * Decision
-* Reasoning
-* Alternatives considered
-* Tradeoffs
+* Consequences
+* Alternatives Considered
 
 ---
 
 # ADR-001: Use a Three-Tier Architecture
+
+## Status
+
+Accepted
 
 ## Context
 
@@ -28,322 +32,468 @@ Use a three-tier architecture:
 
 ```text
 Public Tier       → Application Load Balancer
-Application Tier  → EC2 instances in Auto Scaling Group
+Application Tier  → EC2 Instances in Auto Scaling Group
 Database Tier     → Aurora MySQL
 ```
 
-## Reasoning
+## Consequences
 
-This pattern improves separation of concerns and reflects common production cloud architecture.
+### Positive
+
+* Clear separation of responsibilities
+* Improved security boundaries
+* Easier horizontal scaling
+* Aligns with common enterprise cloud patterns
+
+### Negative
+
+* Increased deployment complexity
+* Higher infrastructure costs than a single-instance design
 
 ## Alternatives Considered
 
-| Alternative                             | Reason Not Selected                                                                    |
-| --------------------------------------- | -------------------------------------------------------------------------------------- |
-| Single EC2 instance with local database | Too simple and not production-oriented                                                 |
-| Serverless-only architecture            | Valid option, but not aligned with the networking and operations goals of this project |
-| Public EC2 application instances        | Larger attack surface                                                                  |
-
-## Tradeoffs
-
-This design is more complex and more expensive than a single-instance architecture, but it better demonstrates real-world cloud engineering practices.
+| Alternative                             | Reason Not Selected                                                |
+| --------------------------------------- | ------------------------------------------------------------------ |
+| Single EC2 instance with local database | Too simple and not production-oriented                             |
+| Serverless-only architecture            | Valid option, but not aligned with networking and operations goals |
+| Public EC2 application instances        | Larger attack surface                                              |
 
 ---
 
 # ADR-002: Use Multi-AZ Networking
 
+## Status
+
+Accepted
+
 ## Context
 
-The platform should avoid depending on a single Availability Zone.
+The platform should avoid dependence on a single Availability Zone.
 
 ## Decision
 
 Deploy public, private application, and private database subnets across two Availability Zones.
 
-## Reasoning
+## Consequences
 
-Multi-AZ design improves availability and supports fault isolation.
+### Positive
+
+* Improved availability
+* Better fault isolation
+* Supports resilient infrastructure design
+
+### Negative
+
+* Increased NAT Gateway costs
+* Additional networking complexity
 
 ## Alternatives Considered
 
-| Alternative          | Reason Not Selected                                                   |
-| -------------------- | --------------------------------------------------------------------- |
-| Single-AZ deployment | Lower cost, but creates single-AZ failure risk                        |
-| Three-AZ deployment  | More resilient, but unnecessary for the project scope and cost target |
-
-## Tradeoffs
-
-Multi-AZ networking increases complexity and cost, especially with NAT Gateways, but provides a more production-aligned architecture.
+| Alternative          | Reason Not Selected                                |
+| -------------------- | -------------------------------------------------- |
+| Single-AZ deployment | Single point of failure                            |
+| Three-AZ deployment  | Increased cost and complexity beyond project scope |
 
 ---
 
 # ADR-003: Place Application Instances in Private Subnets
 
+## Status
+
+Accepted
+
 ## Context
 
-Application instances need to serve user traffic but do not require direct internet exposure.
+Application servers must serve public traffic while minimizing direct exposure.
 
 ## Decision
 
-Deploy EC2 application instances into private application subnets.
+Deploy EC2 application instances into private subnets.
 
-## Reasoning
+## Consequences
 
-Traffic enters through the Application Load Balancer. EC2 instances only accept traffic from the ALB security group.
+### Positive
+
+* Reduced attack surface
+* No public IPs required
+* Supports least-privilege network design
+
+### Negative
+
+* Requires NAT Gateways for outbound internet access
+* Slightly more complex troubleshooting
 
 ## Alternatives Considered
 
-| Alternative                  | Reason Not Selected                 |
-| ---------------------------- | ----------------------------------- |
-| Public EC2 instances         | Increases attack surface            |
-| Bastion host with SSH access | Adds operational overhead           |
-| Fully private access only    | Not suitable for public web traffic |
-
-## Tradeoffs
-
-Private subnets require NAT Gateways for outbound internet access, increasing cost, but improving security posture.
+| Alternative               | Reason Not Selected                      |
+| ------------------------- | ---------------------------------------- |
+| Public EC2 instances      | Increased exposure                       |
+| Bastion host architecture | Additional management overhead           |
+| Fully isolated network    | Not suitable for public web applications |
 
 ---
 
 # ADR-004: Use an Application Load Balancer
 
+## Status
+
+Accepted
+
 ## Context
 
-The application requires public HTTP access and traffic distribution across multiple EC2 instances.
+The platform requires public web access and traffic distribution across multiple application instances.
 
 ## Decision
 
 Use an internet-facing Application Load Balancer.
 
-## Reasoning
+## Consequences
 
-The ALB provides:
+### Positive
 
-* Public traffic entry point
-* Target group health checks
-* Distribution across instances
-* Integration with Auto Scaling
+* Native health checks
+* Traffic distribution
+* Auto Scaling integration
+* High availability
+
+### Negative
+
+* Additional monthly cost
+* Additional infrastructure component to manage
 
 ## Alternatives Considered
 
-| Alternative                | Reason Not Selected                                                    |
-| -------------------------- | ---------------------------------------------------------------------- |
-| Network Load Balancer      | Better for TCP/UDP, but unnecessary for HTTP web traffic               |
-| Elastic IP directly on EC2 | Not highly available                                                   |
-| CloudFront only            | Requires an origin and does not replace load balancing for EC2 targets |
-
-## Tradeoffs
-
-An ALB adds cost, but provides production-style routing, health checks, and availability.
+| Alternative                | Reason Not Selected                          |
+| -------------------------- | -------------------------------------------- |
+| Network Load Balancer      | Optimized for TCP/UDP workloads              |
+| Elastic IP directly on EC2 | Not highly available                         |
+| CloudFront only            | Does not replace load balancing requirements |
 
 ---
 
-# ADR-005: Use Auto Scaling Group for EC2 Instances
+# ADR-005: Use Auto Scaling Groups
+
+## Status
+
+Accepted
 
 ## Context
 
-Application compute should be replaceable and able to scale horizontally.
+Application instances should be replaceable and horizontally scalable.
 
 ## Decision
 
 Deploy EC2 instances through an Auto Scaling Group using a Launch Template.
 
-## Reasoning
+## Consequences
 
-Auto Scaling provides:
+### Positive
 
-* Instance replacement
-* Desired capacity enforcement
-* Multi-AZ compute placement
-* Integration with target groups
+* Self-healing infrastructure
+* Automated instance replacement
+* Consistent deployments
+* Multi-AZ distribution
+
+### Negative
+
+* Additional operational complexity
+* Requires monitoring and health checks
 
 ## Alternatives Considered
 
-| Alternative                     | Reason Not Selected                                            |
-| ------------------------------- | -------------------------------------------------------------- |
-| Manually launched EC2 instances | Not repeatable or self-healing                                 |
-| ECS/Fargate                     | Strong option, but not the focus of this EC2-based platform    |
-| Lambda                          | Not aligned with the project’s infrastructure operations goals |
-
-## Tradeoffs
-
-Auto Scaling adds configuration complexity, but significantly improves operational reliability.
+| Alternative                     | Reason Not Selected                   |
+| ------------------------------- | ------------------------------------- |
+| Manually launched EC2 instances | Not repeatable                        |
+| ECS/Fargate                     | Outside project scope                 |
+| Lambda                          | Not aligned with infrastructure goals |
 
 ---
 
-# ADR-006: Use Aurora MySQL for Database Layer
+# ADR-006: Use Aurora MySQL
+
+## Status
+
+Accepted
 
 ## Context
 
-The project required a managed relational database in a private database tier.
+The platform requires a managed relational database service.
 
 ## Decision
 
 Use Amazon Aurora MySQL.
 
-## Reasoning
+## Consequences
 
-Aurora demonstrates a managed production database pattern with MySQL compatibility.
+### Positive
+
+* Managed service
+* High availability features
+* Automated backups
+* MySQL compatibility
+
+### Negative
+
+* Higher cost than standard MySQL deployments
+* AWS-specific implementation
 
 ## Alternatives Considered
 
-| Alternative            | Reason Not Selected                                                               |
-| ---------------------- | --------------------------------------------------------------------------------- |
-| MySQL installed on EC2 | Higher operational burden                                                         |
-| Standard RDS MySQL     | Valid option, but Aurora better demonstrates enterprise-managed database patterns |
-| DynamoDB               | NoSQL service; not aligned with relational database requirement                   |
-
-## Tradeoffs
-
-Aurora can cost more than simpler options, but reduces database administration overhead and better supports high availability patterns.
+| Alternative  | Reason Not Selected                                                           |
+| ------------ | ----------------------------------------------------------------------------- |
+| MySQL on EC2 | Increased operational burden                                                  |
+| RDS MySQL    | Valid option, but Aurora demonstrates more advanced managed database patterns |
+| DynamoDB     | Does not meet relational database requirements                                |
 
 ---
 
-# ADR-007: Use NAT Gateways for Private Subnet Outbound Access
+# ADR-007: Use NAT Gateways
+
+## Status
+
+Accepted
 
 ## Context
 
-Private application instances require outbound internet access for updates, package downloads, and external service calls.
+Private application instances require outbound internet access.
 
 ## Decision
 
-Use NAT Gateways in public subnets.
+Deploy NAT Gateways in public subnets.
 
-## Reasoning
+## Consequences
 
-NAT Gateways allow private instances to initiate outbound internet connections without allowing inbound internet traffic.
+### Positive
+
+* Private instances can access the internet securely
+* No inbound internet exposure
+* Managed AWS service
+
+### Negative
+
+* One of the largest recurring cost components
+* Additional networking dependencies
 
 ## Alternatives Considered
 
-| Alternative                          | Reason Not Selected                          |
-| ------------------------------------ | -------------------------------------------- |
-| Public IP addresses on EC2 instances | Increases exposure                           |
-| NAT instance                         | Requires patching and operational management |
-| No outbound internet access          | Too restrictive for application operations   |
-
-## Tradeoffs
-
-NAT Gateways are a major cost driver, but they are a production-aligned managed service.
+| Alternative                | Reason Not Selected              |
+| -------------------------- | -------------------------------- |
+| Public IP addresses on EC2 | Increased exposure               |
+| NAT Instance               | Requires management and patching |
+| No internet access         | Too restrictive                  |
 
 ---
 
 # ADR-008: Use Security Group Referencing
 
+## Status
+
+Accepted
+
 ## Context
 
-The platform requires controlled communication between tiers.
+Traffic between tiers should be tightly controlled.
 
 ## Decision
 
-Use security group references instead of broad CIDR-based access where possible.
-
-Traffic model:
+Use Security Group references rather than broad CIDR rules.
 
 ```text
-Internet → ALB Security Group → Application Security Group → Database Security Group
+Internet
+    ↓
+ALB Security Group
+    ↓
+Application Security Group
+    ↓
+Database Security Group
 ```
 
-## Reasoning
+## Consequences
 
-Security group references reduce reliance on static IP ranges and support least-privilege access between layers.
+### Positive
+
+* Least-privilege communication
+* Easier maintenance
+* Improved security posture
+
+### Negative
+
+* Requires dependency-aware deployments
 
 ## Alternatives Considered
 
-| Alternative            | Reason Not Selected                              |
-| ---------------------- | ------------------------------------------------ |
-| Open CIDR rules        | Less secure                                      |
-| Public database access | Not acceptable for production-style architecture |
-| Manual IP allowlists   | Harder to maintain                               |
-
-## Tradeoffs
-
-Security group references require careful dependency ordering during deployment and teardown.
+| Alternative            | Reason Not Selected   |
+| ---------------------- | --------------------- |
+| Broad CIDR access      | Less secure           |
+| Public database access | Not acceptable        |
+| Static allowlists      | Difficult to maintain |
 
 ---
 
 # ADR-009: Use AWS CLI Automation
 
+## Status
+
+Accepted
+
 ## Context
 
-The project needed repeatable infrastructure deployment while reinforcing hands-on understanding of AWS services.
+The project required repeatable infrastructure deployment while reinforcing AWS service-level knowledge.
 
 ## Decision
 
-Use AWS CLI scripts for deployment and teardown automation.
+Deploy infrastructure using AWS CLI automation scripts.
 
-## Reasoning
+## Consequences
 
-AWS CLI automation demonstrates:
+### Positive
 
-* Service-level AWS knowledge
-* Resource dependency awareness
-* Repeatable deployment processes
-* Infrastructure lifecycle management
+* Demonstrates AWS service knowledge
+* Highlights resource dependencies
+* Enables repeatable deployments
+
+### Negative
+
+* Manual dependency management
+* No state management
 
 ## Alternatives Considered
 
-| Alternative               | Reason Not Selected                                                        |
-| ------------------------- | -------------------------------------------------------------------------- |
-| Terraform                 | Strong production option, but abstracts some service-level learning        |
-| CloudFormation            | Strong AWS-native option, but not the focus of this CLI automation project |
-| Manual console deployment | Not repeatable or portfolio-worthy                                         |
+| Alternative       | Reason Not Selected                                                                |
+| ----------------- | ---------------------------------------------------------------------------------- |
+| Terraform         | Excellent production tool, but abstracts some service-level implementation details |
+| CloudFormation    | Strong AWS-native option, but not the focus of this project                        |
+| Manual deployment | Not repeatable                                                                     |
 
-## Tradeoffs
+## Future Evolution
 
-AWS CLI scripts require more manual dependency management than Terraform or CloudFormation. This project intentionally uses CLI automation to demonstrate understanding of AWS resource relationships.
+If this platform were maintained long term, Terraform would likely become the preferred deployment method due to:
+
+* State management
+* Drift detection
+* Collaboration support
+* Reusability
 
 ---
 
-# ADR-010: Use Automated Destroy Process
+# ADR-010: Use Automated Infrastructure Teardown
+
+## Status
+
+Accepted
 
 ## Context
 
-Development environments can create unnecessary cost if left running.
+Development environments can generate unnecessary cost when left running.
 
 ## Decision
 
-Implement a dependency-aware destroy script.
+Implement a dependency-aware destroy process.
 
-## Reasoning
+## Consequences
 
-The destroy process reduces cost and demonstrates full infrastructure lifecycle ownership.
+### Positive
 
-The script handles resource cleanup in dependency order, including:
+* Cost control
+* Demonstrates lifecycle ownership
+* Safe resource cleanup
 
-* Auto Scaling Group
-* ALB listeners
-* Application Load Balancer
-* Target Group
-* Aurora resources
-* NAT Gateways
-* Route tables
-* Security groups
-* Subnets
-* Internet Gateway
-* VPC
+### Negative
+
+* Additional development effort
 
 ## Alternatives Considered
 
 | Alternative             | Reason Not Selected       |
 | ----------------------- | ------------------------- |
-| Manual console cleanup  | Error-prone               |
+| Manual cleanup          | Error-prone               |
 | Leave resources running | Unnecessary cost          |
 | Delete VPC first        | Fails due to dependencies |
 
-## Tradeoffs
+---
 
-Destroy automation adds development effort but improves operational discipline and cost control.
+# ADR-011: Use CloudWatch for Monitoring
+
+## Status
+
+Accepted
+
+## Context
+
+The platform requires operational visibility into infrastructure health and application availability.
+
+## Decision
+
+Use Amazon CloudWatch dashboards and alarms.
+
+## Consequences
+
+### Positive
+
+* Native AWS integration
+* Infrastructure monitoring
+* Alarm notifications
+* Auto Scaling visibility
+
+### Negative
+
+* AWS-specific monitoring implementation
+
+## Alternatives Considered
+
+| Alternative            | Reason Not Selected             |
+| ---------------------- | ------------------------------- |
+| Datadog                | Additional licensing cost       |
+| Prometheus and Grafana | Additional operational overhead |
+| No monitoring          | Not acceptable                  |
+
+---
+
+# ADR-012: Use AWS Systems Manager Instead of SSH
+
+## Status
+
+Accepted
+
+## Context
+
+Administrative access to EC2 instances should minimize exposure and operational overhead.
+
+## Decision
+
+Use AWS Systems Manager Session Manager rather than direct SSH access.
+
+## Consequences
+
+### Positive
+
+* No inbound SSH ports required
+* Reduced attack surface
+* Centralized auditing
+* No SSH key management
+
+### Negative
+
+* Requires SSM permissions and agent availability
+
+## Alternatives Considered
+
+| Alternative       | Reason Not Selected                      |
+| ----------------- | ---------------------------------------- |
+| Public SSH access | Increased attack surface                 |
+| Bastion host      | Additional infrastructure                |
+| VPN access        | Unnecessary complexity for project scope |
 
 ---
 
 # Summary
 
-These architecture decisions reflect a balance between:
+These architecture decisions balance:
 
 * Security
 * Availability
 * Cost
 * Operational complexity
-* Portfolio learning value
+* Educational value
 
-The project intentionally favors production-style design patterns while documenting tradeoffs and future improvements.
+The project intentionally favors production-style AWS design patterns while documenting tradeoffs, operational considerations, and future evolution paths.

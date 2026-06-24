@@ -4,11 +4,18 @@
 
 This document describes the deployment process for the AWS Production Web Platform.
 
-The deployment process provisions a highly available three-tier AWS environment using AWS CLI automation.
+The platform provisions a production-style AWS environment using AWS CLI automation and Bash scripting.
 
-The goal of this deployment process is to create a repeatable, validated, and recoverable infrastructure lifecycle.
+The deployment workflow is designed to demonstrate:
 
-Infrastructure components deployed:
+* Infrastructure lifecycle management
+* Dependency-aware provisioning
+* Repeatable deployments
+* Environment validation
+* Safe infrastructure cleanup
+* Operational troubleshooting
+
+Infrastructure components deployed include:
 
 * VPC networking
 * Public and private subnets
@@ -16,19 +23,43 @@ Infrastructure components deployed:
 * NAT Gateways
 * Route tables
 * Security groups
-* IAM resources
+* IAM roles and instance profiles
 * Application Load Balancer
 * Target Groups
 * Launch Templates
-* Auto Scaling Group
+* Auto Scaling Groups
 * EC2 application instances
-* Aurora MySQL database
+* Aurora MySQL database resources
+
+---
+
+# Deployment Architecture
+
+The deployment process follows a layered architecture.
+
+```text
+Repository Root
+       │
+       ▼
+deploy.sh
+       │
+       ▼
+Setup Validation
+       │
+       ▼
+Infrastructure Deployment
+       │
+       ▼
+Environment Verification
+```
+
+The deployment process uses dependency-aware execution to ensure AWS resources are created in the correct order.
 
 ---
 
 # Prerequisites
 
-Before deployment, verify the following tools, access requirements, and configuration settings.
+Before deployment, verify the following requirements.
 
 Required:
 
@@ -36,34 +67,7 @@ Required:
 * AWS CLI v2
 * Git
 * Bash shell
-* IAM permissions required to provision project resources
-
----
-
-## Required Environment Variables
-
-Database credentials are intentionally excluded from source control.
-
-Before deploying the platform, export the required Aurora database credentials:
-
-```bash
-export DB_MASTER_USERNAME="adminuser"
-export DB_MASTER_PASSWORD="ReplaceWithAStrongPassword123"
-```
-
-Verify the variables are set:
-
-```bash
-echo "$DB_MASTER_USERNAME"
-echo "$DB_MASTER_PASSWORD"
-```
-
-These variables are consumed during Aurora cluster creation and are not stored in the repository.
-
-> Production environments should retrieve credentials from AWS Secrets Manager or another centralized secrets management solution rather than manually exporting values.
-
-```
-```
+* Appropriate IAM permissions
 
 ---
 
@@ -83,48 +87,13 @@ git --version
 bash --version
 ```
 
-Expected:
+Expected output:
 
 ```text
 aws-cli/2.x
 git version 2.x
 GNU bash 4.x or newer
 ```
-
----
-
-## AWS Account Requirements
-
-The deployment provisions:
-
-* Amazon VPC
-* Public and private subnets
-* Internet Gateway
-* NAT Gateways
-* Security Groups
-* IAM Roles
-* Application Load Balancer
-* Auto Scaling Group
-* EC2 Instances
-* Aurora MySQL
-
-Ensure the AWS account has sufficient service quotas and permissions before deployment.
-
----
-
-## IAM Permissions
-
-The deployment identity requires permissions to create and manage:
-
-* EC2 resources
-* Elastic Load Balancing resources
-* Auto Scaling resources
-* Aurora resources
-* IAM roles and instance profiles
-
-For development environments, AdministratorAccess is acceptable.
-
-Production environments should follow least-privilege principles.
 
 ---
 
@@ -138,6 +107,19 @@ git clone https://github.com/nssyjj-code/aws-production-web-platform.git
 cd aws-production-web-platform
 ```
 
+Verify repository structure:
+
+```text
+.
+├── deploy.sh
+├── verify.sh
+├── destroy.sh
+├── config/
+├── scripts/
+├── docs/
+└── policies/
+```
+
 ---
 
 # AWS Authentication
@@ -148,7 +130,7 @@ Configure AWS credentials:
 aws configure
 ```
 
-Validate the authenticated identity:
+Validate authentication:
 
 ```bash
 aws sts get-caller-identity
@@ -160,15 +142,68 @@ Confirm:
 * Correct IAM identity
 * Expected permissions
 
-Infrastructure deployment should only be performed after verifying the active AWS identity.
+Deployment should not proceed until the active AWS identity is verified.
+
+---
+
+# Required Environment Variables
+
+Database credentials are intentionally excluded from source control.
+
+Before deployment:
+
+```bash
+export DB_MASTER_USERNAME="adminuser"
+export DB_MASTER_PASSWORD="ReplaceWithAStrongPassword123"
+```
+
+Verify:
+
+```bash
+echo "$DB_MASTER_USERNAME"
+echo "$DB_MASTER_PASSWORD"
+```
+
+These values are consumed during Aurora cluster creation and are never stored within:
+
+* Source control
+* Deployment scripts
+* Configuration files
+
+Production environments should use AWS Secrets Manager rather than manually exported variables.
+
+---
+
+# Environment Configuration
+
+Deployment configuration is stored in:
+
+```text
+config/environment.conf
+```
+
+Examples:
+
+* AWS Region
+* Resource names
+* CIDR allocations
+* Auto Scaling settings
+* Aurora settings
+* Environment naming conventions
+
+Review configuration values before deployment.
+
+Deployment scripts should never be modified to change environment settings.
+
+Configuration should remain externalized.
 
 ---
 
 # Cost Awareness
 
-This project provisions production-style AWS infrastructure.
+This platform provisions production-style AWS infrastructure.
 
-Resources that contribute most significantly to cost include:
+Primary cost drivers include:
 
 * NAT Gateways
 * Aurora MySQL
@@ -177,80 +212,17 @@ Resources that contribute most significantly to cost include:
 
 Development environments should be destroyed when not actively used.
 
-Cleanup:
+Cleanup command:
 
 ```bash
-./scripts/cleanup/destroy-environment.sh
+./destroy.sh
 ```
 
-Detailed cost analysis and optimization strategies are documented in:
+Additional cost information:
 
 ```text
 docs/governance/cost-optimization.md
 ```
-
----
-
-# Region Configuration
-
-Default deployment region:
-
-```text
-us-east-1
-```
-
-Verify configured region:
-
-```bash
-aws configure get region
-```
-
----
-
-# Environment Configuration
-
-Deployment settings are stored in:
-
-```text
-config/environment.conf
-```
-
-Configuration values include:
-
-* AWS Region
-* Resource names
-* CIDR ranges
-* Auto Scaling settings
-* Database configuration
-
-Review configuration values before deployment.
-
-The deployment automation loads configuration directly from this file.
-
-Avoid modifying deployment scripts to change environment settings.
-
-Configuration should remain separated from automation logic.
-
----
-
-# Database Credentials
-
-Database credentials are provided through environment variables during deployment.
-
-Example:
-
-```bash
-export DB_MASTER_USERNAME="adminuser"
-export DB_MASTER_PASSWORD="ReplaceWithAStrongPassword"
-```
-
-This prevents database credentials from being stored in:
-
-* Deployment scripts
-* Configuration files
-* Source control
-
-Production environments should use AWS Secrets Manager or another secrets management solution.
 
 ---
 
@@ -259,50 +231,83 @@ Production environments should use AWS Secrets Manager or another secrets manage
 Start deployment:
 
 ```bash
-./scripts/deploy/deploy.sh
+./deploy.sh
 ```
 
-The deployment automation provisions resources in dependency order.
+The deployment wrapper automatically executes:
+
+```text
+Setup Validation
+      │
+      ▼
+Infrastructure Deployment
+      │
+      ▼
+Resource Verification
+```
+
+No individual deployment scripts need to be executed manually.
 
 ---
 
 # Deployment Stages
 
-## Stage 1 — Network Foundation
+## Stage 1 – Environment Validation
 
-Creates:
+Validates:
 
-* VPC
-* Availability Zone layout
-* Public subnets
-* Private application subnets
-* Private database subnets
+* AWS CLI installation
+* AWS credentials
+* Configuration files
+* Repository structure
 
-Validation:
+Scripts:
 
-```bash
-aws ec2 describe-vpcs
+```text
+scripts/setup/01-verify-environment.sh
+scripts/setup/02-configure-aws.sh
 ```
 
 ---
 
-## Stage 2 — Network Routing
+## Stage 2 – Network Foundation
+
+Creates:
+
+* VPC
+* Public subnets
+* Private application subnets
+* Private database subnets
+
+Resources:
+
+```text
+VPC
+Subnets
+Availability Zones
+```
+
+---
+
+## Stage 3 – Network Routing
 
 Creates:
 
 * Internet Gateway
-* Elastic IP addresses
+* Elastic IPs
 * NAT Gateways
 * Route tables
 * Route associations
 
-Expected public routing:
+Expected routing:
+
+Public:
 
 ```text
 0.0.0.0/0 → Internet Gateway
 ```
 
-Expected private routing:
+Private Application:
 
 ```text
 0.0.0.0/0 → NAT Gateway
@@ -310,63 +315,48 @@ Expected private routing:
 
 ---
 
-## Stage 3 — Security Layer
+## Stage 4 – Security Layer
 
-Creates security groups enforcing tier isolation.
+Creates:
+
+* ALB Security Group
+* Application Security Group
+* Database Security Group
 
 Traffic model:
 
 ```text
 Internet
-    |
-    v
-Application Load Balancer
-    |
-    v
-Application Instances
-    |
-    v
-Aurora MySQL
-```
-
-Rules:
-
-Load Balancer:
-
-```text
-Inbound:
-HTTP 80 from Internet
-```
-
-Application:
-
-```text
-Inbound:
-HTTP 80 from ALB Security Group
-```
-
-Database:
-
-```text
-Inbound:
-MySQL 3306 from Application Security Group
+    │
+    ▼
+ALB
+    │
+    ▼
+Application Tier
+    │
+    ▼
+Database Tier
 ```
 
 ---
 
-## Stage 4 — IAM Configuration
+## Stage 5 – IAM Configuration
 
 Creates:
 
-* EC2 IAM role
-* Instance profile
-* Required permissions
+* EC2 IAM Role
+* Instance Profile
+* Systems Manager permissions
 
-IAM permissions allow EC2 resources to interact securely with AWS services without embedded credentials.
+Benefits:
+
+* No embedded credentials
+* Secure AWS service access
+* Session Manager administration
 
 ---
 
-## Stage 5 — Compute Deployment
+## Stage 6 – Compute Deployment
 
 Creates:
 
@@ -374,7 +364,7 @@ Creates:
 * Auto Scaling Group
 * EC2 instances
 
-Validate:
+Validation:
 
 ```bash
 aws autoscaling describe-auto-scaling-groups
@@ -389,15 +379,15 @@ HealthStatus = Healthy
 
 ---
 
-## Stage 6 — Load Balancer Deployment
+## Stage 7 – Load Balancer Deployment
 
 Creates:
 
 * Application Load Balancer
 * Target Group
-* Listener configuration
+* Listener
 
-Validate:
+Validation:
 
 ```bash
 aws elbv2 describe-target-health \
@@ -412,15 +402,15 @@ TargetHealth.State = healthy
 
 ---
 
-## Stage 7 — Database Deployment
+## Stage 8 – Database Deployment
 
 Creates:
 
 * Aurora subnet group
-* Aurora MySQL cluster
+* Aurora cluster
 * Aurora writer instance
 
-Validate:
+Validation:
 
 ```bash
 aws rds describe-db-clusters
@@ -434,104 +424,134 @@ Status = available
 
 ---
 
-# Post Deployment Validation
+# Post-Deployment Verification
 
-Run environment validation:
+Run:
 
 ```bash
-./scripts/validation/verify-environment.sh
+./verify.sh
 ```
 
-Validation confirms:
+Verification checks:
 
 ## Networking
 
 * VPC exists
-* Subnets are deployed across Availability Zones
-* Routes are configured correctly
+* Subnets exist
+* Route tables configured
 
 ## Compute
 
-* Auto Scaling Group is active
-* Instances are healthy
-* Target checks are passing
+* Auto Scaling Group active
+* Instances healthy
+* Target Group healthy
 
 ## Database
 
-* Aurora cluster is available
-* Database networking is configured
+* Aurora cluster available
+* Aurora instance available
 
 ## Security
 
-Confirms:
-
-* EC2 instances are private
-* Database is not publicly accessible
-* Security groups follow least privilege access
+* Private application instances
+* Private database resources
+* Security groups configured correctly
 
 ---
 
 # Deployment Troubleshooting
 
-Common deployment failures:
+Common issues:
 
-| Issue               | Possible Cause                |
-| ------------------- | ----------------------------- |
-| AccessDenied        | Missing IAM permissions       |
-| DependencyViolation | Resource dependency conflict  |
-| LimitExceeded       | AWS quota exceeded            |
-| InvalidParameter    | Incorrect configuration value |
-| AuthFailure         | Incorrect AWS credentials     |
+| Error               | Cause                        |
+| ------------------- | ---------------------------- |
+| AccessDenied        | Missing IAM permissions      |
+| DependencyViolation | Resource dependency conflict |
+| LimitExceeded       | AWS quota exceeded           |
+| InvalidParameter    | Configuration issue          |
+| AuthFailure         | AWS authentication issue     |
 
-Recommended troubleshooting process:
+Troubleshooting process:
 
-1. Review deployment output
-2. Identify failed AWS service
-3. Validate configuration
+1. Review deployment logs
+2. Identify failing AWS service
+3. Verify configuration
 4. Verify permissions
 5. Correct issue
-6. Retry deployment
+6. Re-run deployment
+
+Because the deployment is idempotent, rerunning deployment after correcting an issue is generally safe.
 
 ---
 
 # Rollback Procedure
 
-If deployment cannot be recovered, remove the environment:
+Remove the environment:
 
 ```bash
-./scripts/cleanup/destroy-environment.sh
+./destroy.sh
 ```
 
-The destroy workflow removes resources using dependency-aware ordering.
+Cleanup removes resources using reverse dependency ordering.
 
-Cleanup includes:
+Examples:
 
-* Application resources
-* Load balancing resources
-* Compute resources
-* Database resources
-* Networking resources
-* IAM resources
+```text
+Auto Scaling Group
+      │
+      ▼
+Load Balancer
+      │
+      ▼
+Target Group
+      │
+      ▼
+Aurora Resources
+      │
+      ▼
+Networking Resources
+```
+
+This prevents AWS dependency violations.
 
 ---
 
-# Production Improvements
+# Production Evolution
 
-Future production enhancements:
+Future enhancements could include:
 
-* Infrastructure as Code migration
-* CI/CD pipeline deployment
+* Terraform
+* CloudFormation
+* GitHub Actions CI/CD
 * Automated testing
-* Blue/green deployments
-* Canary releases
-* Deployment approval workflows
-* Automated rollback mechanisms
+* Drift detection
 * Secrets Manager integration
+* Multi-environment deployments
+* Change approval workflows
+* Blue/Green deployments
+
+---
+
+# Related Documentation
+
+Additional deployment references:
+
+```text
+docs/deployment/automation-design.md
+docs/operations/testing-strategy.md
+docs/operations/operational-runbook.md
+```
 
 ---
 
 # Summary
 
-This deployment process demonstrates complete infrastructure lifecycle management.
+The deployment process demonstrates a complete infrastructure lifecycle including:
 
-The focus is not only creating AWS resources, but building a repeatable, secure, and operationally maintainable deployment workflow.
+* Validation
+* Provisioning
+* Verification
+* Troubleshooting
+* Cleanup
+
+The automation emphasizes repeatability, operational visibility, dependency awareness, and production-style cloud deployment practices while remaining practical for development and portfolio use.

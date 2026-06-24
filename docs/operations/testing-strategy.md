@@ -2,39 +2,80 @@
 
 ## Overview
 
-This document describes the validation and testing procedures used for the AWS Production Web Platform.
+This document describes the testing and validation approach used for the AWS Production Web Platform.
 
-Testing focuses on verifying:
+Testing is performed throughout the infrastructure lifecycle to verify that deployed resources function as expected and satisfy architecture, security, availability, and operational requirements.
 
-* Infrastructure deployment
-* Network connectivity
-* Application availability
-* Database accessibility
-* Security controls
+The testing strategy focuses on:
+
+* Infrastructure validation
+* Network connectivity testing
+* Application availability testing
+* Database validation
+* Security verification
 * Operational readiness
+* Failure recovery validation
 
-The objective is to confirm that deployed resources function as expected and meet architecture requirements.
+The objective is to ensure deployments are reliable, repeatable, and production-ready.
+
+---
+
+# Testing Objectives
+
+The testing strategy is designed to answer the following questions:
+
+### Infrastructure
+
+* Were all resources deployed successfully?
+* Are resources configured correctly?
+
+### Availability
+
+* Can users access the application?
+* Are load balancer health checks passing?
+
+### Security
+
+* Are network boundaries enforced?
+* Are resources properly isolated?
+
+### Operations
+
+* Can incidents be detected?
+* Can failed resources be recovered?
+
+### Recovery
+
+* Can the environment be restored after failures?
+* Are recovery procedures effective?
 
 ---
 
 # Testing Categories
 
-The platform is validated using:
+The platform uses multiple testing categories.
 
-1. Infrastructure Testing
-2. Network Testing
-3. Application Testing
-4. Database Testing
-5. Security Validation
-6. Operational Validation
+| Category                  | Purpose                            |
+| ------------------------- | ---------------------------------- |
+| Infrastructure Testing    | Resource validation                |
+| Network Testing           | Connectivity validation            |
+| Application Testing       | Service availability               |
+| Database Testing          | Data tier validation               |
+| Security Testing          | Access control verification        |
+| Operational Testing       | Monitoring and recovery validation |
+| Disaster Recovery Testing | Recovery procedure validation      |
 
 ---
 
 # Infrastructure Testing
 
+Infrastructure testing validates successful deployment of AWS resources.
+
+---
+
 ## VPC Validation
 
-Verify VPC creation:
+Verify VPC deployment:
 
 ```bash
 aws ec2 describe-vpcs
@@ -50,7 +91,7 @@ Expected:
 
 ## Subnet Validation
 
-Verify subnets:
+Verify subnet creation:
 
 ```bash
 aws ec2 describe-subnets
@@ -58,13 +99,38 @@ aws ec2 describe-subnets
 
 Expected:
 
-* Public subnets created
-* Private application subnets created
-* Private database subnets created
+* Public subnets exist
+* Private application subnets exist
+* Private database subnets exist
+* Correct Availability Zone placement
+
+---
+
+## Route Validation
+
+Verify route tables:
+
+```bash
+aws ec2 describe-route-tables
+```
+
+Expected:
+
+```text
+Public Route Table
+0.0.0.0/0 → Internet Gateway
+
+Private Route Tables
+0.0.0.0/0 → NAT Gateway
+```
 
 ---
 
 # Compute Testing
+
+Compute testing validates application infrastructure.
+
+---
 
 ## Auto Scaling Group Validation
 
@@ -96,14 +162,15 @@ Expected:
 * Running state
 * Correct subnet placement
 * IAM role attached
+* Status checks passing
 
 ---
 
 # Load Balancer Testing
 
-## ALB Validation
+## Application Load Balancer Validation
 
-Verify load balancer:
+Verify ALB:
 
 ```bash
 aws elbv2 describe-load-balancers
@@ -117,9 +184,9 @@ State = active
 
 ---
 
-## Target Group Health
+## Target Health Validation
 
-Verify target health:
+Verify targets:
 
 ```bash
 aws elbv2 describe-target-health \
@@ -134,11 +201,30 @@ TargetHealth.State = healthy
 
 ---
 
+## DNS Accessibility Validation
+
+Verify:
+
+```text
+Internet
+      │
+      ▼
+Application Load Balancer
+```
+
+Expected:
+
+* DNS resolution successful
+* HTTP response returned
+* Load balancer reachable
+
+---
+
 # Database Testing
 
 ## Aurora Validation
 
-Verify Aurora status:
+Verify cluster health:
 
 ```bash
 aws rds describe-db-clusters
@@ -152,9 +238,32 @@ Status = available
 
 ---
 
+## Aurora Instance Validation
+
+Verify writer instance:
+
+```bash
+aws rds describe-db-instances
+```
+
+Expected:
+
+```text
+DBInstanceStatus = available
+```
+
+---
+
 ## Connectivity Validation
 
-Verify application instances can connect to Aurora.
+Verify:
+
+```text
+Application Tier
+       │
+       ▼
+Aurora MySQL
+```
 
 Expected:
 
@@ -166,56 +275,116 @@ Expected:
 
 # Network Testing
 
-## Public Connectivity
+## Public Connectivity Testing
 
-Verify:
+Validate:
 
 ```text
 Internet
-     |
-     v
+     │
+     ▼
 Application Load Balancer
 ```
 
 Expected:
 
-* ALB reachable
 * DNS resolution successful
+* HTTP connectivity available
 
 ---
 
-## Private Connectivity
+## Private Connectivity Testing
 
-Verify:
+Validate:
 
 ```text
-EC2
- |
- v
-Aurora
+Application Tier
+       │
+       ▼
+Database Tier
 ```
 
 Expected:
 
-* Database communication succeeds
-* No direct public access
+* Internal communication succeeds
+* No public database access
 
 ---
 
-# Security Validation
+## Outbound Connectivity Testing
+
+Validate:
+
+```text
+Private Application Subnet
+          │
+          ▼
+NAT Gateway
+          │
+          ▼
+Internet
+```
+
+Expected:
+
+* Package downloads succeed
+* External API communication succeeds
+
+---
+
+# Security Testing
+
+Security testing validates least-privilege architecture.
+
+---
+
+## Network Isolation Testing
 
 Verify:
 
-* EC2 instances have no public IPs
+* EC2 instances do not have public IP addresses
 * Aurora is not publicly accessible
-* Security groups follow least privilege access
-* IAM roles are attached correctly
+* Private subnets remain isolated
 
 ---
 
-# Session Manager Validation
+## Security Group Testing
 
-Verify Systems Manager access:
+Verify:
+
+```text
+Internet
+    │
+    ▼
+ALB Security Group
+    │
+    ▼
+Application Security Group
+    │
+    ▼
+Database Security Group
+```
+
+Expected:
+
+* Only approved traffic paths exist
+* No unnecessary inbound access
+
+---
+
+## IAM Validation
+
+Verify:
+
+* IAM roles attached
+* Instance profiles attached
+* No embedded credentials
+
+---
+
+# Systems Manager Testing
+
+Validate administrative access.
 
 ```bash
 aws ssm describe-instance-information
@@ -228,14 +397,73 @@ Expected:
 
 ---
 
-# Deployment Validation Script
+# Operational Testing
 
-The environment includes validation automation.
+Operational testing validates monitoring and recovery procedures.
+
+---
+
+## Monitoring Validation
+
+Verify:
+
+* CloudWatch metrics available
+* Health checks functioning
+* Alarms configured (future enhancement)
+
+Reference:
+
+```text
+docs/operations/monitoring-strategy.md
+```
+
+---
+
+## Incident Response Validation
+
+Simulate operational failures.
+
+Examples:
+
+* Failed EC2 instance
+* Unhealthy target
+* Database connectivity issue
+
+Reference:
+
+```text
+docs/operations/incident-response-scenarios.md
+```
+
+---
+
+# Disaster Recovery Testing
+
+Recovery procedures should be tested periodically.
+
+Examples:
+
+* EC2 replacement validation
+* Auto Scaling recovery testing
+* Aurora recovery testing
+* Infrastructure redeployment testing
+
+Reference:
+
+```text
+docs/operations/disaster-recovery.md
+```
+
+---
+
+# Automated Validation
+
+The environment includes automated verification.
 
 Execute:
 
 ```bash
-./scripts/validation/verify-environment.sh
+./verify.sh
 ```
 
 Validation confirms:
@@ -243,6 +471,7 @@ Validation confirms:
 * Resource existence
 * Service health
 * Deployment success
+* Infrastructure readiness
 
 ---
 
@@ -250,29 +479,67 @@ Validation confirms:
 
 A deployment is considered successful when:
 
-* Infrastructure resources are created
-* Auto Scaling instances are healthy
-* Target group health checks pass
-* Aurora is available
-* Security controls are functioning
-* Validation script completes successfully
+### Infrastructure
+
+* All resources created successfully
+
+### Availability
+
+* ALB healthy
+* Targets healthy
+* EC2 instances healthy
+
+### Database
+
+* Aurora cluster available
+* Aurora writer available
+
+### Security
+
+* Network segmentation validated
+* Security groups functioning correctly
+
+### Operations
+
+* Monitoring operational
+* Recovery procedures validated
+
+### Automation
+
+* Verification script completes successfully
 
 ---
 
-# Future Testing Improvements
+# Future Testing Enhancements
 
-Potential enhancements:
+Potential improvements include:
 
 * Automated integration testing
-* Load testing
+* CI/CD pipeline testing
+* Infrastructure policy testing
 * Security scanning
-* Continuous validation
-* CI/CD testing pipeline
+* Load testing
+* Chaos engineering exercises
+* Automated disaster recovery testing
+* Continuous validation pipelines
+
+---
+
+# Related Documentation
+
+Additional references:
+
+```text
+docs/operations/monitoring-strategy.md
+docs/operations/incident-response-scenarios.md
+docs/operations/disaster-recovery.md
+docs/operations/operational-runbook.md
+```
 
 ---
 
 # Summary
 
-Testing is used to verify that infrastructure, networking, security, compute, and database resources function as expected after deployment.
+Testing is used to verify that infrastructure, networking, compute, database, security, and operational controls function as expected throughout the platform lifecycle.
 
-The goal is to ensure deployments are reliable, repeatable, and operationally ready.
+The strategy extends beyond deployment validation and includes operational readiness, monitoring validation, incident response testing, and disaster recovery verification to better reflect production cloud engineering practices.

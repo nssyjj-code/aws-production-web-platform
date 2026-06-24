@@ -2,81 +2,141 @@
 
 ## Overview
 
-This document describes the cost considerations, optimization strategies, and architectural tradeoffs for the AWS Production Web Platform.
+This document describes the cost considerations, optimization strategies, and architectural tradeoffs associated with the AWS Production Web Platform.
 
-The environment is designed to demonstrate production-style cloud architecture while maintaining awareness of operational costs.
+The platform was intentionally designed to demonstrate production-style AWS architecture patterns while maintaining awareness of infrastructure cost management.
 
-Cost optimization goals:
+The goal is not simply to minimize spending, but to understand the engineering tradeoffs between:
+
+* Cost
+* Availability
+* Security
+* Performance
+* Operational complexity
+
+This project aligns with concepts from the AWS Well-Architected Framework Cost Optimization Pillar.
+
+---
+
+# Cost Optimization Objectives
+
+The platform was designed with the following cost optimization objectives:
 
 * Understand primary AWS cost drivers
-* Avoid unnecessary resource usage
-* Right-size infrastructure based on workload requirements
-* Balance availability, reliability, security, and cost
-* Implement lifecycle management to reduce unused resources
-
-This project follows concepts from the AWS Well-Architected Framework Cost Optimization pillar.
+* Avoid unnecessary resource consumption
+* Right-size infrastructure components
+* Balance cost with availability requirements
+* Support environment lifecycle management
+* Demonstrate production-oriented architecture decisions
+* Encourage cost visibility and accountability
 
 ---
 
-# Estimated Development Cost
+# AWS Well-Architected Alignment
 
-This project is intended as a portfolio and learning environment rather than a continuously running production workload.
+This project incorporates several principles from the AWS Well-Architected Framework Cost Optimization Pillar.
 
-Approximate monthly costs in us-east-1 at default sizing:
+Implemented practices include:
 
-| Service                   | Estimated Monthly Cost |
-| ------------------------- | ---------------------- |
-| NAT Gateways (2)          | High                   |
-| Aurora MySQL              | High                   |
-| EC2 Instances             | Moderate               |
-| Application Load Balancer | Moderate               |
-| Storage and Data Transfer | Variable               |
+* Right-sized EC2 instance selection
+* Controlled Auto Scaling limits
+* Resource lifecycle automation
+* Automated environment teardown
+* Centralized configuration management
+* Resource tagging standards
+* Cost-aware architecture decisions
 
-Expected monthly operating cost:
+Cost optimization is treated as a continuous operational responsibility rather than a one-time design exercise.
 
-```text
-Approximately $80–120/month
-```
+---
 
-Actual costs will vary based on:
+# Cost Awareness
 
-* EC2 instance type
-* Aurora instance class
+This platform provisions multiple managed AWS services.
+
+Expected operating costs will vary depending on:
+
+* AWS Region
+* EC2 instance sizing
+* Aurora instance sizing
+* Storage utilization
 * Network traffic
-* Runtime duration
-* Storage consumption
+* Environment runtime duration
+* Future architecture modifications
+
+Users should always review current AWS pricing before deployment.
+
+The largest cost contributors are typically:
+
+* NAT Gateways
+* Aurora resources
+* Application Load Balancers
+* EC2 compute resources
 
 ---
 
-## Cost Management Recommendation
+# Cost Management Recommendation
 
-This environment should be destroyed when not actively used.
+This environment is intended primarily for:
+
+* Learning
+* Portfolio development
+* Architecture demonstrations
+* Infrastructure automation practice
+
+The environment should be destroyed when not actively being used.
 
 Cleanup command:
 
 ```bash
-./scripts/cleanup/destroy-environment.sh
+./destroy.sh
 ```
 
-Automated teardown is included to reduce unnecessary AWS charges and support responsible cloud cost management.
+Automated teardown helps reduce unnecessary AWS charges and encourages responsible cloud resource management.
 
 ---
 
 # Cost Design Philosophy
 
-This project intentionally prioritizes learning production architecture patterns over creating the lowest-cost AWS environment.
+This project intentionally prioritizes learning production architecture patterns over building the lowest-cost AWS environment.
 
-Some resources increase cost but were selected because they represent real-world enterprise designs.
+Several architectural decisions increase cost but more accurately reflect real-world enterprise deployments.
 
-Examples:
+Examples include:
 
 * Multi-AZ networking
-* Multiple NAT Gateways
-* Managed relational database
+* Dedicated NAT Gateways
+* Aurora MySQL
 * Application Load Balancer
 * Auto Scaling architecture
+* Private application infrastructure
 
-Lower-cost alternatives are documented where appropriate.
+The objective is to demonstrate production design principles rather than optimize exclusively for minimum cost.
+
+---
+
+# Portfolio Design vs Cost Optimization
+
+This project intentionally does not represent the least expensive AWS implementation.
+
+Many architectural choices were selected to demonstrate enterprise cloud design patterns.
+
+| Component      | Lower Cost Option   | Implemented Design        |
+| -------------- | ------------------- | ------------------------- |
+| NAT Gateway    | Single NAT Gateway  | Multi-AZ NAT Gateways     |
+| Database       | RDS MySQL           | Aurora MySQL              |
+| Compute        | Single EC2 Instance | Auto Scaling Group        |
+| Networking     | Flat Network        | Segmented Three-Tier VPC  |
+| Administration | SSH Access          | AWS Systems Manager       |
+| Load Balancing | Single Instance     | Application Load Balancer |
+
+The selected architecture increases cost while improving:
+
+* Availability
+* Fault tolerance
+* Security
+* Operational maturity
+* Demonstration of AWS best practices
 
 ---
 
@@ -84,23 +144,23 @@ Lower-cost alternatives are documented where appropriate.
 
 | AWS Service               | Purpose                        | Cost Consideration                            |
 | ------------------------- | ------------------------------ | --------------------------------------------- |
-| Application Load Balancer | Public traffic distribution    | Hourly usage and load balancer capacity units |
-| EC2                       | Application compute layer      | Instance runtime, size, and storage           |
-| Auto Scaling Group        | Compute availability           | Controls number of running instances          |
-| Aurora MySQL              | Managed database layer         | Instance runtime, storage, backups, and I/O   |
-| NAT Gateway               | Private subnet outbound access | Hourly runtime and processed data             |
-| Elastic Block Store       | EC2 storage                    | Provisioned storage capacity                  |
+| Application Load Balancer | Traffic distribution           | Hourly usage and Load Balancer Capacity Units |
+| EC2 Instances             | Application compute            | Runtime duration, sizing, storage             |
+| Auto Scaling Group        | Compute availability           | Number of running instances                   |
+| Aurora MySQL              | Database services              | Instance runtime, storage, backups, I/O       |
+| NAT Gateway               | Private subnet internet access | Hourly usage and data processing              |
+| Amazon EBS                | Persistent storage             | Provisioned capacity                          |
 | Data Transfer             | Network communication          | Cross-AZ and internet traffic                 |
 
 ---
 
 # Compute Cost Optimization
 
-## EC2 Auto Scaling
+## Auto Scaling Design
 
-The application tier uses EC2 instances managed by an Auto Scaling Group.
+The application tier uses EC2 instances managed through an Auto Scaling Group.
 
-Configuration:
+Current configuration:
 
 ```text
 Minimum Capacity: 2
@@ -108,86 +168,95 @@ Desired Capacity: 2
 Maximum Capacity: 4
 ```
 
-## Cost Benefits
+Benefits:
 
-Auto Scaling helps:
+* Improved availability
+* Automatic instance replacement
+* Controlled resource growth
+* Reduced over-provisioning risk
 
-* Match capacity with application demand
-* Prevent unnecessary over-provisioning
-* Replace unhealthy resources automatically
+---
 
-## Production Improvements
+## Optimization Opportunities
 
-Additional optimization strategies:
+Future improvements may include:
 
-* Analyze utilization metrics before resizing
-* Use Compute Savings Plans for predictable workloads
-* Use Reserved Instances for stable long-term workloads
-* Evaluate AWS Graviton processors for better price/performance
-* Implement scaling policies based on application metrics
+* Dynamic scaling policies
+* Compute Savings Plans
+* Reserved Instances
+* AWS Graviton adoption
+* Utilization-based instance right-sizing
+
+Monitoring utilization metrics should always precede infrastructure resizing decisions.
 
 ---
 
 # Networking Cost Optimization
 
-## NAT Gateway Architecture Decision
+## NAT Gateway Architecture
 
-### Current Design
-
-This environment deploys NAT Gateways across multiple Availability Zones.
+The environment deploys one NAT Gateway per Availability Zone.
 
 Architecture:
 
 ```text
-Private Subnet AZ-A
-        |
-        v
-NAT Gateway AZ-A
+Private App Subnet AZ1
+          │
+          ▼
+     NAT Gateway AZ1
 
-
-Private Subnet AZ-B
-        |
-        v
-NAT Gateway AZ-B
+Private App Subnet AZ2
+          │
+          ▼
+     NAT Gateway AZ2
 ```
 
-## Reason
+---
 
-This design improves availability by avoiding dependency on a single Availability Zone.
+## Design Rationale
 
-If one Availability Zone fails, private resources in the remaining Availability Zone maintain outbound connectivity.
+The design improves availability by preventing a single Availability Zone dependency.
+
+Benefits:
+
+* Improved resilience
+* Better fault isolation
+* Availability during AZ failures
+
+---
 
 ## Cost Tradeoff
 
-Multi-AZ NAT Gateways increase hourly cost compared to using a single NAT Gateway.
+A lower-cost alternative would use a single NAT Gateway.
 
-Alternative development design:
+Example:
 
 ```text
-Private Subnet AZ-A
-        |
-        |
-        v
-Single NAT Gateway
+Private App Subnet AZ1
+          │
+          ▼
+     NAT Gateway
 
-        ^
-        |
-Private Subnet AZ-B
+          ▲
+          │
+
+Private App Subnet AZ2
 ```
 
 Benefits:
 
 * Lower monthly cost
-* Fewer resources
+* Fewer managed resources
 
-Tradeoff:
+Tradeoffs:
 
-* Creates single-AZ dependency
-* Less resilient architecture
+* Single point of failure
+* Cross-AZ dependency
+* Reduced resiliency
 
 Decision:
 
-Production reliability was prioritized over minimum cost.
+Availability was prioritized over minimum cost.
 
 ---
 
@@ -199,42 +268,45 @@ Aurora was selected to demonstrate managed database architecture.
 
 Benefits:
 
-* Managed database operations
+* Managed operations
 * Automated backups
 * High availability capabilities
 * MySQL compatibility
+* Reduced administrative overhead
+
+---
 
 ## Cost Considerations
 
-Primary database costs:
+Aurora costs are primarily influenced by:
 
-* Database instance runtime
-* Storage usage
+* Instance runtime
+* Storage utilization
 * Backup retention
 * Database I/O activity
 
 ---
 
-## Development Optimization
+## Development Recommendations
 
-For temporary environments:
+Development environments can reduce costs by:
 
-* Stop database resources when unused
-* Use smaller database instances
-* Reduce backup retention periods
-* Destroy environments after testing
+* Using smaller instance classes
+* Reducing backup retention periods
+* Destroying environments when idle
+* Limiting test data growth
 
 ---
 
-## Production Optimization
+## Production Recommendations
 
-For production workloads:
+Production workloads should:
 
 * Monitor CPU utilization
-* Monitor connection usage
-* Right-size database instances
-* Evaluate Aurora Serverless for variable workloads
-* Review storage growth trends
+* Review connection counts
+* Analyze storage growth
+* Right-size instance classes
+* Evaluate Aurora Serverless where appropriate
 
 ---
 
@@ -242,35 +314,20 @@ For production workloads:
 
 ## Amazon EBS
 
-EC2 instances use EBS-backed storage.
+Application instances use EBS-backed storage.
 
-Optimization practices:
+Recommended practices:
 
-* Select appropriate volume types
+* Use General Purpose SSD volumes
+* Monitor storage consumption
 * Remove unattached volumes
-* Monitor disk utilization
-* Avoid over-provisioning capacity
+* Avoid excessive provisioning
 
-General Purpose SSD storage provides a balance between:
+Benefits:
 
-* Cost
-* Performance
-* Reliability
-
----
-
-# Development vs Production Cost Strategy
-
-Different environments require different cost decisions.
-
-| Component    | Development Approach   | Production Approach          |
-| ------------ | ---------------------- | ---------------------------- |
-| NAT Gateway  | Single NAT possible    | Multi-AZ NAT recommended     |
-| EC2          | Smaller instances      | Right-sized capacity         |
-| Auto Scaling | Lower minimum capacity | Availability-focused scaling |
-| Aurora       | Smaller instances      | Performance-based sizing     |
-| Backups      | Short retention        | Business requirement based   |
-| Monitoring   | Basic metrics          | Full observability           |
+* Balanced performance
+* Predictable costs
+* Operational simplicity
 
 ---
 
@@ -278,97 +335,114 @@ Different environments require different cost decisions.
 
 Unused cloud resources create unnecessary costs.
 
-This project includes automated teardown:
+The project includes automated environment destruction.
+
+Command:
 
 ```bash
-./scripts/cleanup/destroy-environment.sh
+./destroy.sh
 ```
 
-The destroy process removes:
+The cleanup workflow removes:
 
-* Application Load Balancer
+* Application Load Balancers
 * Target Groups
 * Auto Scaling Groups
 * EC2 resources
 * Aurora resources
 * NAT Gateways
 * Elastic IPs
-* Networking resources
+* Route tables
+* Security groups
+* Subnets
+* VPC resources
 * IAM resources
 
-The cleanup process prevents development environments from running when not needed.
+This prevents development environments from generating ongoing charges.
 
 ---
 
 # Resource Tagging Strategy
 
-Resource tagging improves cost visibility and governance.
+The platform uses resource tagging to improve governance and cost visibility.
 
-Recommended tags:
+Example tags:
 
 ```text
 Project=aws-production-web-platform
-Environment=development
+Environment=prod
 ManagedBy=aws-cli
-Owner=cloud-engineering
 ```
 
 Benefits:
 
 * Cost allocation tracking
-* Resource ownership
-* Automation targeting
+* Resource ownership visibility
 * Governance reporting
+* Automation targeting
 
 ---
 
 # Cost Monitoring Strategy
 
-Production environments should include active cost monitoring.
+Production environments should implement continuous cost monitoring.
+
+---
 
 ## AWS Budgets
 
 Used for:
 
-* Monthly spending limits
+* Monthly spending thresholds
 * Cost notifications
-* Usage tracking
+* Budget tracking
 
-## Cost Explorer
+---
+
+## AWS Cost Explorer
 
 Used for:
 
-* Service cost analysis
-* Usage trends
+* Service-level cost analysis
+* Usage trend identification
 * Optimization opportunities
 
-## Cost Anomaly Detection
+---
+
+## AWS Cost Anomaly Detection
 
 Used for:
 
 * Unexpected spending changes
-* Abnormal resource usage
-* Early cost alerts
+* Resource misconfiguration detection
+* Early warning alerts
 
 ---
 
 # Cost Controls Implemented
 
-Implemented in this project:
+Current controls include:
 
 * Automated environment teardown
-* Controlled resource provisioning
-* Private networking design
-* Auto Scaling capacity management
-* Resource organization through naming standards
+* Controlled Auto Scaling limits
+* Centralized configuration management
+* Resource tagging
+* Managed service selection
+* Environment validation before deployment
 
-Recommended future improvements:
+---
+
+# Future Cost Improvements
+
+Potential enhancements include:
 
 * AWS Budget alerts
-* Automated shutdown schedules
-* Infrastructure as Code cost estimation
-* CI/CD cost validation
-* Resource utilization dashboards
+* Scheduled environment shutdowns
+* Cost estimation during deployment
+* Infrastructure cost reporting
+* Utilization dashboards
+* Rightsizing recommendations
+* Multi-environment cost allocation
 
 ---
 
@@ -378,15 +452,15 @@ Recommended future improvements:
 
 Decision:
 
-Use multiple Availability Zones.
+Deploy resources across multiple Availability Zones.
 
 Benefit:
 
-Improves fault tolerance.
+Improved fault tolerance and resiliency.
 
 Tradeoff:
 
-Additional infrastructure cost.
+Additional infrastructure costs.
 
 ---
 
@@ -394,43 +468,65 @@ Additional infrastructure cost.
 
 Decision:
 
-Use Aurora instead of self-managed MySQL.
+Use Aurora MySQL.
 
 Benefit:
 
-Reduced operational overhead.
+Reduced operational overhead and managed database features.
 
 Tradeoff:
 
-Higher service cost.
+Higher service cost compared to self-managed databases.
 
 ---
 
-## Private Infrastructure vs Simplicity
+## Security vs Cost
 
 Decision:
 
-Use private subnets with NAT Gateways.
+Deploy application resources within private subnets behind NAT Gateways.
 
 Benefit:
 
-Improved security posture.
+Reduced attack surface and stronger security posture.
 
 Tradeoff:
 
-Additional networking cost.
+Additional networking costs.
+
+---
+
+# Related Documentation
+
+Additional architecture and governance references:
+
+```text
+docs/architecture/architecture-decisions.md
+docs/deployment/deployment-guide.md
+docs/governance/security.md
+```
+
+Relevant architectural decisions:
+
+```text
+ADR-003 Multi-AZ Subnet Architecture
+ADR-005 Dual NAT Gateway Design
+ADR-010 Aurora MySQL Selection
+ADR-012 Systems Manager Instead of SSH
+```
 
 ---
 
 # Summary
 
-The architecture intentionally balances production design practices with cost awareness.
+The AWS Production Web Platform intentionally balances production-style architecture with cost awareness.
 
-The objective is not only to minimize AWS spending, but to understand engineering tradeoffs between:
+The goal is not simply to minimize AWS spending, but to understand the engineering tradeoffs between:
 
 * Cost
 * Security
 * Availability
+* Performance
 * Operational complexity
 
-Cost optimization is treated as an ongoing operational responsibility rather than a one-time design decision.
+Cost optimization is treated as an ongoing operational responsibility that evolves alongside the platform architecture.

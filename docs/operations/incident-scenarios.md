@@ -1,58 +1,104 @@
-# Incident Scenarios
+# Incident Response Scenarios
 
 ## Overview
 
 This document contains simulated production incidents performed against the AWS Production Web Platform.
 
-The purpose of these scenarios is to demonstrate operational troubleshooting, root cause analysis, and recovery procedures.
+The purpose of these scenarios is to demonstrate operational troubleshooting, incident response, root cause analysis, and recovery procedures.
 
-Each incident follows the process:
+Each incident follows a structured operational workflow:
 
-1. Identify symptoms
-2. Investigate affected services
-3. Determine root cause
-4. Apply remediation
-5. Document preventative improvements
+1. Detection
+2. Triage
+3. Investigation
+4. Root Cause Identification
+5. Remediation
+6. Recovery Validation
+7. Preventative Improvements
 
 ---
 
-# Incident 001 — Application Load Balancer Returns 503 Errors
+# Incident Severity Definitions
+
+| Severity | Description       | Example Impact                      |
+| -------- | ----------------- | ----------------------------------- |
+| SEV-1    | Critical outage   | Complete application unavailability |
+| SEV-2    | Major degradation | Significant customer impact         |
+| SEV-3    | Minor degradation | Limited functionality affected      |
+| SEV-4    | Informational     | No customer impact                  |
+
+---
+
+# Incident 001 – Application Load Balancer Returning HTTP 503 Errors
 
 ## Severity
 
 SEV-2
 
+## Detection
+
+Source:
+
+```text
+CloudWatch Alarm
+```
+
+Alert:
+
+```text
+UnHealthyHostCount > 0
+```
+
+Customer Impact:
+
+```text
+Users unable to access application
+```
+
+---
+
 ## Scenario
 
 Users report the website is unavailable.
 
-HTTP requests to the Application Load Balancer return:
+Requests to the Application Load Balancer return:
 
 ```text
-503 Service Unavailable
+HTTP 503 Service Unavailable
 ```
 
 ---
 
-## Initial Investigation
+## Incident Timeline
 
-Verify Application Load Balancer state:
+```text
+06:00 Alarm Triggered
+06:03 Incident Acknowledged
+06:07 Investigation Started
+06:15 Root Cause Identified
+06:22 Instance Replaced
+06:28 Service Restored
+06:40 Incident Closed
+```
+
+---
+
+## Investigation
+
+Verify ALB health:
 
 ```bash
 aws elbv2 describe-load-balancers \
-  --names prod-web-app-alb
+  --names "$ALB_NAME"
 ```
 
-Validate:
+Result:
 
-* ALB is active
-* Availability Zones are enabled
+```text
+Load Balancer Status = active
+```
 
----
-
-## Target Group Investigation
-
-Check registered targets:
+Check target health:
 
 ```bash
 aws elbv2 describe-target-health \
@@ -69,24 +115,20 @@ TargetHealth.State = unhealthy
 
 ## Root Cause
 
-EC2 instances failed ALB health checks.
+Application instances failed health checks.
 
 Possible causes:
 
 * Application process stopped
-* Incorrect health check path
-* Security group blocking traffic
-* Instance startup failure
+* Incorrect health check endpoint
+* Security group misconfiguration
+* Launch template startup failure
 
 ---
 
 ## Resolution
 
-Validate application service status.
-
-Restart application service if required.
-
-If instance is unhealthy:
+Replace unhealthy instance:
 
 ```bash
 aws autoscaling terminate-instance-in-auto-scaling-group \
@@ -94,62 +136,105 @@ aws autoscaling terminate-instance-in-auto-scaling-group \
   --should-decrement-desired-capacity false
 ```
 
-Auto Scaling launches a replacement instance.
+Auto Scaling launched replacement capacity.
 
 ---
 
-## Prevention
+## Recovery Validation
 
-Recommended improvements:
-
-* CloudWatch alarm for unhealthy targets
-* Application health endpoint monitoring
-* Centralized application logs
-
----
-
-# Incident 002 — Database Connection Failure
-
-## Severity
-
-SEV-2
-
-## Scenario
-
-Application instances are healthy but users experience application errors.
-
-Application logs show database connection failures.
-
----
-
-## Investigation
-
-Verify Aurora status:
+Validate:
 
 ```bash
-aws rds describe-db-clusters \
-  --db-cluster-identifier prod-aurora-cluster
+aws elbv2 describe-target-health \
+  --target-group-arn <target-group-arn>
 ```
 
 Expected:
 
 ```text
-Status = available
+TargetHealth.State = healthy
 ```
 
 ---
 
-## Network Validation
+## Action Items
 
-Check security group communication:
+* Add synthetic monitoring
+* Create application health dashboard
+* Improve startup validation checks
 
-Expected flow:
+---
+
+# Incident 002 – Database Connectivity Failure
+
+## Severity
+
+SEV-2
+
+## Detection
+
+Source:
 
 ```text
-Application Security Group
-        |
-        v
-Database Security Group
+Application Error Logs
+```
+
+Alert:
+
+```text
+Database Connection Failures
+```
+
+---
+
+## Scenario
+
+Application instances remain healthy but user requests fail.
+
+Application logs show:
+
+```text
+Unable to connect to database
+```
+
+---
+
+## Incident Timeline
+
+```text
+11:12 Alert Received
+11:15 Investigation Started
+11:22 Security Group Issue Identified
+11:27 Rule Restored
+11:30 Service Recovered
+```
+
+---
+
+## Investigation
+
+Verify Aurora cluster:
+
+```bash
+aws rds describe-db-clusters \
+  --db-cluster-identifier "$AURORA_CLUSTER_IDENTIFIER"
+```
+
+Result:
+
+```text
+Status = available
+```
+
+Validate security groups.
+
+Expected communication:
+
+```text
+APP Security Group
+        │
+        ▼
+DB Security Group
 TCP 3306
 ```
 
@@ -157,53 +242,75 @@ TCP 3306
 
 ## Root Cause
 
-Database security group does not allow inbound MySQL traffic from application instances.
+Database security group rule was removed.
 
 ---
 
 ## Resolution
 
-Restore security group rule:
+Restore rule:
 
 ```bash
 aws ec2 authorize-security-group-ingress \
-  --group-id <database-sg-id> \
+  --group-id <db-sg-id> \
   --protocol tcp \
   --port 3306 \
-  --source-group <application-sg-id>
+  --source-group <app-sg-id>
 ```
 
 ---
 
-## Prevention
+## Recovery Validation
 
-Recommended improvements:
+Validate connectivity:
 
-* Infrastructure drift detection
-* Security group change monitoring
-* AWS Config rules
+```bash
+mysql -h <endpoint> -u <user>
+```
+
+Application errors resolved.
 
 ---
 
-# Incident 003 — Private EC2 Instances Cannot Access Internet
+## Action Items
+
+* Enable AWS Config rule monitoring
+* Implement security group drift detection
+* Add automated validation checks
+
+---
+
+# Incident 003 – Private Instances Cannot Reach the Internet
 
 ## Severity
 
 SEV-3
 
+## Detection
+
+Source:
+
+```text
+Application Logs
+```
+
+Symptoms:
+
+* Failed package downloads
+* Failed API calls
+* Update failures
+
+---
+
 ## Scenario
 
-Application instances cannot:
-
-* Download packages
-* Receive software updates
-* Access external APIs
+Private application instances cannot access external services.
 
 ---
 
 ## Investigation
 
-Verify NAT Gateway status:
+Check NAT Gateway status:
 
 ```bash
 aws ec2 describe-nat-gateways
@@ -215,9 +322,7 @@ Expected:
 State = available
 ```
 
----
-
-Check private route tables:
+Check route tables:
 
 ```bash
 aws ec2 describe-route-tables
@@ -233,67 +338,89 @@ Expected route:
 
 ## Root Cause
 
-Private subnet route table missing NAT Gateway route.
+Private application route table missing NAT route.
 
 ---
 
 ## Resolution
 
-Restore outbound route:
+Restore route:
 
 ```bash
 aws ec2 create-route \
-  --route-table-id <private-route-table-id> \
+  --route-table-id <route-table-id> \
   --destination-cidr-block 0.0.0.0/0 \
   --nat-gateway-id <nat-id>
 ```
 
 ---
 
-## Prevention
+## Recovery Validation
 
-Recommended improvements:
+Verify outbound connectivity:
 
-* Automated infrastructure validation
-* Route monitoring
-* Infrastructure as Code state management
+```bash
+curl https://aws.amazon.com
+```
+
+Expected:
+
+```text
+HTTP 200
+```
 
 ---
 
-# Incident 004 — Auto Scaling Group Not Replacing Instances
+## Action Items
+
+* Add route validation to verification scripts
+* Add CloudWatch route monitoring
+* Implement drift detection
+
+---
+
+# Incident 004 – Auto Scaling Group Not Launching Replacement Capacity
 
 ## Severity
 
 SEV-2
 
+## Detection
+
+Source:
+
+```text
+CloudWatch Alarm
+```
+
+Alert:
+
+```text
+GroupInServiceInstances < DesiredCapacity
+```
+
+---
+
 ## Scenario
 
-EC2 instance fails but replacement capacity is not created.
+Failed instances are not replaced automatically.
 
 ---
 
 ## Investigation
 
-Check Auto Scaling Group:
+Check ASG:
 
 ```bash
 aws autoscaling describe-auto-scaling-groups \
-  --auto-scaling-group-names prod-web-asg
+  --auto-scaling-group-names "$ASG_NAME"
 ```
-
-Validate:
-
-* Desired capacity
-* Launch template
-* Availability Zones
-
----
 
 Review scaling activities:
 
 ```bash
 aws autoscaling describe-scaling-activities \
-  --auto-scaling-group-name prod-web-asg
+  --auto-scaling-group-name "$ASG_NAME"
 ```
 
 ---
@@ -302,50 +429,67 @@ aws autoscaling describe-scaling-activities \
 
 * Invalid launch template
 * Missing IAM permissions
-* AMI unavailable
-* Instance capacity issues
+* Unavailable AMI
+* Capacity constraints
 
 ---
 
 ## Resolution
 
-Correct failed dependency.
+Correct dependency issue.
 
 Refresh instances:
 
 ```bash
 aws autoscaling start-instance-refresh \
-  --auto-scaling-group-name prod-web-asg
+  --auto-scaling-group-name "$ASG_NAME"
 ```
 
 ---
 
-## Prevention
+## Recovery Validation
 
-Recommended improvements:
+Verify:
 
-* Launch template validation
-* CloudWatch scaling alarms
-* Deployment testing pipeline
+```bash
+Desired Capacity = Running Capacity
+```
 
 ---
 
-# Incident 005 — Infrastructure Destroy Failure
+## Action Items
+
+* Add launch template validation
+* Implement deployment testing
+* Add scaling activity alarms
+
+---
+
+# Incident 005 – Environment Destruction Failure
 
 ## Severity
 
 SEV-3
 
-## Scenario
+## Detection
 
-Environment teardown script fails.
+Source:
+
+```text
+Destroy Script Output
+```
 
 Error:
 
 ```text
-ResourceInUse:
-Target group is currently in use by a listener or rule
+ResourceInUse
 ```
+
+---
+
+## Scenario
+
+Destroy automation fails while removing infrastructure.
 
 ---
 
@@ -360,29 +504,31 @@ aws elbv2 describe-listeners \
 
 Finding:
 
-Target Group is still attached to an ALB listener.
+```text
+Target Group attached to Listener
+```
 
 ---
 
 ## Root Cause
 
-AWS dependency order prevented deletion.
+Dependency ordering issue.
 
-Incorrect order:
+Incorrect:
 
 ```text
 Delete Target Group
-        |
-        v
+      │
+      ▼
 Delete Listener
 ```
 
-Correct order:
+Correct:
 
 ```text
 Delete Listener
-        |
-        v
+      │
+      ▼
 Delete Target Group
 ```
 
@@ -390,30 +536,44 @@ Delete Target Group
 
 ## Resolution
 
-Updated destroy automation:
+Destroy workflow updated to:
 
-1. Remove listeners
+1. Delete listeners
 2. Delete ALB
-3. Delete Target Group
+3. Delete target groups
 
 ---
 
-## Prevention
+## Recovery Validation
 
-Improved cleanup automation with dependency-aware deletion logic.
+Destroy process completed successfully.
+
+---
+
+## Action Items
+
+* Expand dependency validation
+* Improve destroy script logging
+* Add cleanup integration testing
 
 ---
 
 # Lessons Learned
 
-Operational reliability requires more than successful deployments.
+Operational excellence requires more than successful deployments.
 
-Production environments require:
+Reliable cloud platforms require:
 
 * Monitoring
-* Dependency awareness
-* Failure testing
+* Alerting
 * Recovery procedures
-* Automation improvements
+* Dependency awareness
+* Operational runbooks
+* Failure testing
+* Continuous improvement
 
-The goal is not preventing every failure, but reducing detection and recovery time.
+The objective is not eliminating all failures.
+
+The objective is reducing Mean Time To Detect (MTTD) and Mean Time To Recover (MTTR).
+
+These scenarios demonstrate how production-style incidents can be detected, investigated, resolved, and prevented using AWS operational best practices.
