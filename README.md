@@ -1,104 +1,414 @@
 # AWS Production Web Platform
 
-A production-style AWS infrastructure project built with Bash and the AWS CLI before transitioning to Terraform.
+A production-style AWS infrastructure platform built with Bash and the AWS CLI to demonstrate cloud engineering, automation, networking, security, operational readiness, and infrastructure lifecycle management.
 
-This project provisions a multi-tier, highly available web platform using modular, idempotent deployment scripts and shared helper libraries.
+The project provisions a highly available three-tier web application environment across multiple Availability Zones using modular, idempotent deployment automation and AWS managed services.
 
-## Architecture
+> This project was intentionally built using AWS CLI automation before transitioning to Terraform in order to develop a deeper understanding of AWS service dependencies, infrastructure provisioning workflows, and operational troubleshooting.
+
+---
+
+# Architecture Overview
 
 ![AWS Production Web Platform Architecture](docs/architecture/diagrams/architecture.svg)
 
-The platform includes:
-
-* Multi-AZ VPC
-* Public, private application, and private database subnets
-* Internet Gateway
-* NAT Gateways per Availability Zone
-* Custom route tables
-* Layered security groups
-* EC2 IAM role and instance profile for SSM access
-* Launch Template
-* Application Load Balancer
-* Target Group
-* Auto Scaling Group
-* Private Aurora MySQL database
-
-## Features
-
-* Multi-Availability Zone VPC architecture
-* Public, private application, and private database subnets
-* High availability using NAT Gateways in each Availability Zone
-* Layered security groups following least privilege principles
-* IAM roles and instance profiles for EC2
-* Application Load Balancer with Target Group
-* Launch Template and Auto Scaling Group
-* Private Amazon Aurora MySQL database
-* Modular deployment scripts
-* Shared helper libraries for reusable infrastructure functions
-* Idempotent deployments that safely re-run existing resources
-* Automated deployment and verification scripts
-* Configuration-driven environment using a centralized configuration file
-
-## Current Status
-
-Core infrastructure deployment is complete using AWS CLI automation.
-
-## Repository Structure
+## High-Level Design
 
 ```text
-config/       Shared environment configuration
-docs/         Project documentation
-diagrams/     Architecture diagrams
-monitoring/   Future CloudWatch dashboards and alarms
-policies/     IAM trust policies
-scripts/      Deployment, verification, destroy, and helper scripts
-user-data/    EC2 bootstrap scripts
+Internet
+    │
+    ▼
+Application Load Balancer
+    │
+    ▼
+Auto Scaling Group
+    │
+    ▼
+Private EC2 Application Instances
+    │
+    ▼
+Aurora MySQL Cluster
 ```
 
-## Deployment
+### Key Architecture Characteristics
+
+* Multi-AZ deployment across two Availability Zones
+* Public, private application, and private database subnet tiers
+* Internet-facing Application Load Balancer
+* Auto Scaling application layer
+* Private Aurora MySQL database
+* NAT Gateway architecture for outbound internet access
+* Layered security group design
+* IAM role-based EC2 access
+* Infrastructure lifecycle automation
+* Environment validation and recovery workflows
+
+---
+
+# Technologies Used
+
+## AWS Services
+
+* Amazon VPC
+* Amazon EC2
+* EC2 Launch Templates
+* EC2 Auto Scaling
+* Elastic Load Balancing (ALB)
+* Amazon Aurora MySQL
+* IAM Roles and Instance Profiles
+* NAT Gateways
+* Internet Gateway
+* CloudWatch
+* Systems Manager (SSM)
+
+## Languages & Tools
+
+* Bash
+* AWS CLI v2
+* Git
+* GitHub
+* Draw.io
+* ShellCheck
+
+---
+
+# Skills Demonstrated
+
+This project demonstrates practical experience with:
+
+### Cloud Infrastructure
+
+* Multi-tier AWS architecture
+* Multi-AZ deployments
+* High availability design
+* Infrastructure lifecycle management
+
+### Networking
+
+* VPC design
+* CIDR planning
+* Public and private subnet architecture
+* Route tables
+* Internet Gateways
+* NAT Gateways
+
+### Security
+
+* Security group segmentation
+* Least privilege design
+* IAM roles and instance profiles
+* Private application and database tiers
+* Secrets handling practices
+
+### Automation
+
+* Modular Bash automation
+* Idempotent deployment design
+* Dependency-aware provisioning
+* Environment validation
+* Automated teardown
+
+### Operations
+
+* Monitoring strategy
+* Incident response procedures
+* Disaster recovery planning
+* Operational runbooks
+* Troubleshooting workflows
+
+---
+
+# Features
+
+## Infrastructure
+
+* Multi-AZ VPC architecture
+* Public and private subnet segmentation
+* Highly available NAT Gateway design
+* Layered security group model
+* IAM-based EC2 access
+
+## Compute
+
+* Launch Templates
+* Auto Scaling Group
+* Automated instance replacement
+* EC2 bootstrap automation via user-data
+
+## Load Balancing
+
+* Application Load Balancer
+* Target Groups
+* Health checks
+* Cross-AZ traffic distribution
+
+## Database
+
+* Aurora MySQL Cluster
+* Private database deployment
+* Dedicated DB subnet group
+* Security group isolation
+
+## Automation
+
+* Configuration-driven deployments
+* Shared helper libraries
+* Modular deployment scripts
+* Idempotent resource creation
+* Automated validation
+* Automated environment cleanup
+
+---
+
+# Quick Start
+
+## Prerequisites
+
+* AWS Account
+* AWS CLI v2
+* Git
+* Bash
+
+Configure AWS credentials:
+
+```bash
+aws configure
+```
+
+Verify authentication:
+
+```bash
+aws sts get-caller-identity
+```
+
+---
+
+## Database Credentials
+
+Aurora credentials are intentionally excluded from source control.
+
+Set required environment variables:
 
 ```bash
 export DB_MASTER_USERNAME="adminuser"
-export DB_MASTER_PASSWORD="Use-A-Strong-Password-Here123!"
+export DB_MASTER_PASSWORD="ReplaceWithAStrongPassword"
+```
 
+---
+
+## Deploy
+
+Deploy the entire platform:
+
+```bash
 ./deploy.sh
 ```
 
-## Verification
+---
+
+## Verify
+
+Validate deployed resources:
 
 ```bash
 ./verify.sh
 ```
 
-## Monitoring
+---
 
-This project includes CloudWatch monitoring automation.
+## Destroy
 
-Implemented:
-
-- CloudWatch dashboard for ALB, Auto Scaling, and Aurora metrics
-- CloudWatch alarms for unhealthy targets, 5XX errors, latency, ASG capacity, and Aurora health
-- Separate monitoring scripts under `/monitoring`
-
-Run:
+Remove all deployed resources:
 
 ```bash
-./monitoring/dashboards/create-dashboard.sh
-./monitoring/alarms/create-alarms.sh
+./destroy.sh
 ```
 
-## Security Notes
+---
 
-* No AWS credentials are committed to the repository.
-* EC2 instances use IAM roles instead of access keys.
-* Application instances are deployed in private subnets.
-* Database resources are deployed in private database subnets.
-* Security groups follow a layered access model:
+# Repository Structure
 
-  * Internet → ALB
-  * ALB → Application
-  * Application → Database
+```text
+aws-production-web-platform/
 
-## Project Goal
+├── config/
+├── docs/
+│   ├── architecture/
+│   ├── deployment/
+│   ├── governance/
+│   ├── operations/
+│   └── project/
+│
+├── monitoring/
+├── policies/
+├── scripts/
+├── user-data/
+│
+├── deploy.sh
+├── verify.sh
+├── destroy.sh
+└── README.md
+```
 
-The goal of this repository is to demonstrate production-style cloud engineering practices using AWS CLI before rebuilding the same architecture with Terraform.
+---
+
+# Documentation
+
+## Architecture
+
+* Architecture Overview
+* Architecture Decisions
+* Network Design
+
+Location:
+
+```text
+docs/architecture/
+```
+
+## Deployment
+
+* Deployment Guide
+* Automation Design
+* AWS Authentication
+* Testing Strategy
+
+Location:
+
+```text
+docs/deployment/
+```
+
+## Operations
+
+* Monitoring Strategy
+* Operational Runbook
+* Incident Scenarios
+* Disaster Recovery Plan
+* Lessons Learned
+
+Location:
+
+```text
+docs/operations/
+```
+
+## Governance
+
+* Security Design
+* Cost Optimization
+
+Location:
+
+```text
+docs/governance/
+```
+
+---
+
+# Monitoring
+
+The platform includes CloudWatch monitoring automation.
+
+Current implementation:
+
+* CloudWatch dashboards
+* ALB health monitoring
+* Auto Scaling monitoring
+* Aurora monitoring
+* CloudWatch alarms
+
+Examples include:
+
+* Unhealthy targets
+* HTTP 5XX errors
+* Elevated latency
+* Capacity issues
+* Database health events
+
+---
+
+# Security Highlights
+
+* No AWS credentials stored in source control
+* EC2 IAM roles instead of access keys
+* Private application tier
+* Private database tier
+* Layered security group model
+* Least privilege access principles
+* Systems Manager support for administrative access
+
+Traffic model:
+
+```text
+Internet
+    │
+    ▼
+ALB
+    │
+    ▼
+Application Tier
+    │
+    ▼
+Database Tier
+```
+
+---
+
+# Lessons Learned
+
+A dedicated engineering retrospective documents key lessons learned while building and operating the platform, including:
+
+* Dependency management
+* Infrastructure automation
+* AWS networking
+* Launch Template lifecycle management
+* Idempotent deployments
+* Operational validation
+
+See:
+
+```text
+docs/operations/lessons-learned.md
+```
+
+---
+
+# Future Roadmap
+
+Planned enhancements include:
+
+* Terraform implementation
+* GitHub Actions CI/CD
+* AWS Secrets Manager integration
+* CloudWatch dashboard automation
+* AWS WAF
+* CloudTrail auditing
+* AWS Config compliance rules
+* Infrastructure testing pipelines
+* OpenID Connect (OIDC) authentication
+
+---
+
+# Why This Project Exists
+
+Many AWS portfolio projects focus only on resource creation.
+
+This project was designed to go further by emphasizing:
+
+* Architecture design
+* Security
+* Automation
+* Operations
+* Monitoring
+* Incident response
+* Disaster recovery
+* Documentation
+
+The goal is to demonstrate the responsibilities commonly performed by Cloud Engineers and Cloud Operations Engineers in production AWS environments.
+
+---
+
+# License
+
+This project is licensed under the MIT License.
